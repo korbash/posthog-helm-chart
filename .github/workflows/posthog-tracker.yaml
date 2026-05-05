@@ -1,0 +1,176 @@
+name: posthog-tracker
+
+on:
+  schedule:
+    # Daily at 08:00 UTC.
+    - cron: "0 8 * * *"
+  workflow_dispatch:
+    inputs:
+      since_hours:
+        description: "How many hours back to look for upstream commits (default: 24)"
+        required: false
+        default: "24"
+      dry_run:
+        description: "Dry run: print what would be opened, don't create issues"
+        type: boolean
+        required: false
+        default: false
+
+concurrency:
+  group: posthog-tracker
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  issues: write
+  id-token: write
+
+jobs:
+  track:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Fetch recent PostHog upstream commits
+        id: commits
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SINCE_HOURS: ${{ github.event.inputs.since_hours || '24' }}
+        run: |
+          set -euo pipefail
+          SINCE=$(date -u -d "${SINCE_HOURS} hours ago" +%Y-%m-%dT%H:%M:%SZ)
+          echo "Fetching PostHog/posthog master commits since $SINCE"
+          gh api \
+            "repos/PostHog/posthog/commits?sha=master&since=${SINCE}&per_page=100" \
+            --jq '[.[] | {
+              sha: .sha,
+              message: .commit.message,
+              author: .commit.author.name,
+              date: .commit.author.date,
+              url: .html_url
+            }]' > /tmp/posthog-commits.json
+          COUNT=$(jq length /tmp/posthog-commits.json)
+          echo "Found $COUNT commits in window"
+          if [ "$COUNT" -eq 0 ]; then
+            echo "has_commits=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "has_commits=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Build tracker prompt
+        id: build_prompt
+        if: steps.commits.outputs.has_commits == 'true'
+        env:
+          DRY_RUN_INPUT: ${{ github.event.inputs.dry_run || 'false' }}
+        run: |
+          set -euo pipefail
+          COMMITS=$(cat /tmp/posthog-commits.json)
+
+          if [ "$DRY_RUN_INPUT" = "true" ]; then
+            MODE_INSTRUCTION="You are running in DRY RUN mode. DO NOT call \`gh issue create\`. Print a structured report to stdout only."
+            ACTION_INSTRUCTION="For every relevant commit, print:
+
+          ---
+          WOULD OPEN ISSUE: <title>
+          Priority: Breaking | Important | Minor
+          Commits: <sha(s)>
+          Why it matters here: <2-3 sentences>
+          Files in this repo likely affected: <paths or 'unknown'>
+          Suggested action: <what a maintainer should do>
+          ---
+
+          End with: 'X relevant changes found out of Y total commits. Z issues would be opened.'"
+          else
+            MODE_INSTRUCTION="Create GitHub issues for relevant changes via \`gh issue create\` in THIS repository."
+            ACTION_INSTRUCTION="Rules:
+          - Before creating, list open issues with label \`posthog-tracker\` and skip duplicates (same SHA(s) or same upstream PR).
+          - Title: \`[posthog-tracker] <short summary>\`
+          - Body must include: priority (Breaking/Important/Minor), upstream commit links, why it matters here, files in this repo likely affected, suggested action.
+          - Labels: always add \`posthog-tracker\`. Add \`priority/breaking\`, \`priority/important\`, or \`priority/minor\` matching the priority.
+          - If nothing is relevant, do nothing."
+          fi
+
+          {
+            echo 'prompt<<PROMPT_DELIM'
+            cat <<PROMPT_EOF
+          You are auditing upstream PostHog commits to decide whether they require changes to THIS repository.
+
+          ABOUT THIS REPO (\`blitss/posthog-helm-chart\`):
+          A self-hosted Helm chart that wraps upstream PostHog (\`PostHog/posthog\`) for Kubernetes. It does NOT vendor the application code — it builds custom container images from upstream and ships its own Helm chart and Flux manifests around them.
+
+          RELEVANT PIECES OF THIS REPO:
+          - \`charts/posthog/\` — the Helm chart (Deployments, Services, ConfigMaps, Secrets, ClickHouse + ClickHouse-Keeper config XML embedded in templates).
+          - \`charts/posthog/values.yaml\` — defaults for every component (web, worker, workerBeat, workerExports, temporalDjangoWorker, plugins, capture, replayCapture, captureAi, captureLogs, featureFlags, propertyDefsRs, livestream, cymbal, cyclotronJanitor, migrate, asyncMigrationsCheck) and Kafka topic provisioning.
+          - \`charts/posthog/templates/external/clickhouse.yaml\` — ClickHouse config.xml + users.xml profiles, system-table TTLs, profile settings copied from upstream \`docker/clickhouse/config.xml\` and \`docker/clickhouse/users.xml\`.
+          - \`images/posthog/Dockerfile.{web,worker,worker-exports,migrate,bootstrap-clickhouse}\` — custom Dockerfiles built from upstream \`production.Dockerfile\` style images.
+          - \`vendor/posthog/docker/clickhouse/user_defined_function.xml\` and \`vendor/posthog/user_scripts/\` — files copied verbatim from upstream (auto-synced by \`sync-posthog-user-scripts\` workflow).
+          - \`scripts/update-topics.sh\` — pulls Kafka topic list from upstream (auto-synced by \`sync-posthog-topics\` workflow).
+          - \`manifests/posthog/release.yaml\` — Flux HelmRelease values used in production.
+
+          ALREADY AUTO-SYNCED — DO NOT FILE ISSUES FOR THESE:
+          - Kafka topic config (\`posthog/clickhouse/kafka_engine.py\`, \`posthog/kafka_client/topics.py\`) → handled by \`sync-posthog-topics.yaml\`.
+          - ClickHouse user-defined functions and user scripts under \`posthog/user_scripts/\` and \`posthog/clickhouse/user_defined_function.xml\` → handled by \`sync-posthog-user-scripts.yaml\`.
+
+          FILES THAT MATTER (the *only* paths worth a closer look):
+          - \`docker-compose*.yml\` / \`docker-compose*.yaml\` — service topology. New service blocks here are the strongest signal a new Deployment may be needed.
+          - \`*Dockerfile*\` and \`production.Dockerfile\` — image build contract (new build stages, new entrypoints, removed binaries).
+          - \`docker/**\` — config files copied into images (especially \`docker/clickhouse/config.xml\`, \`docker/clickhouse/users.xml\`).
+          - \`bin/start-*\`, \`bin/migrate-*\`, \`bin/*\` — entrypoint scripts the chart invokes.
+          - \`charts/**\` (upstream's own helm chart, if touched) — structural changes (new templates, removed components).
+          - \`.github/workflows/build-*\` and \`*.dockerignore\` — image build pipeline contract.
+
+          The FILES THAT MATTER list is your reference when reading a diff — if the only changed files in a fetched diff are outside that list, drop it.
+
+          WHAT TO FLAG (priority Breaking or Important) — STRUCTURAL changes inside the watched paths:
+          1. New services/processes added in \`docker-compose*\` or \`charts/**\` that don't yet have a Deployment in this repo. THIS IS THE PRIMARY FOCUS.
+          2. Removed or renamed services/components that this chart still references.
+          3. Changes to \`bin/\` entrypoints that change CLI args, flags, or env-var contracts.
+          4. Changes to \`docker/clickhouse/config.xml\` or \`docker/clickhouse/users.xml\` (must be ported into our embedded XML).
+          5. Changes to Dockerfile *structure* — new build args, new stages, new \`COPY\`/\`RUN\` that change runtime layout, removed binaries.
+
+          WHAT TO IGNORE (even if the file is in the watched list):
+          - **Image version bumps, base-image bumps, dependency version bumps of any kind.** Renovate handles these locally.
+          - Helm chart version bumps in upstream's \`Chart.yaml\` or \`values.yaml\` image-tag fields.
+          - Pure tag/digest/version-string changes inside docker-compose or Dockerfiles.
+          - Anything outside the FILES THAT MATTER list — Python source, frontend, tests, docs, fixtures, telemetry, settings modules, migrations, telemetry, CI workflows that don't build images.
+
+          DECISION HEURISTIC: First filter is path. If no watched path is touched → skip. Second filter is shape. If the change is only a version string/tag/digest → skip. Only flag when (a) a watched path is touched AND (b) the *shape* of a service, build, or config changes.
+
+          ${MODE_INSTRUCTION}
+
+          COMMITS TO TRIAGE (already fetched, do not re-list):
+          ${COMMITS}
+
+          STEPS:
+          1. Skim each commit message. Discard obvious non-infra (UI, tests, docs, telemetry, refactors, version bumps). Only commit messages that plausibly imply a change to docker-compose, Dockerfiles, bin/ entrypoints, or ClickHouse XML are worth a diff.
+          2. For surviving candidates only, fetch the diff: \`gh api repos/PostHog/posthog/commits/<sha>\`. Confirm the change is structural and within the FILES THAT MATTER list.
+          3. Decide priority: Breaking (this chart is broken or will break without action), Important (config drift, missing functionality), Minor (cosmetic, optional).
+          4. ${ACTION_INSTRUCTION}
+
+          IMPORTANT:
+          - Do NOT explore this repo's code beyond what's described above. The summary in this prompt is sufficient context.
+          - Do NOT spawn subagents.
+          - Be conservative: when unsure whether a commit affects this chart, skip it. False positives are worse than false negatives.
+          PROMPT_EOF
+            echo 'PROMPT_DELIM'
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Run posthog-tracker (Claude Code)
+        if: steps.commits.outputs.has_commits == 'true'
+        uses: anthropics/claude-code-action@v1
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          prompt: ${{ steps.build_prompt.outputs.prompt }}
+          claude_args: |
+            --model claude-opus-4-7
+            --allowed-tools "Bash(gh api:*),Bash(gh issue list:*),Bash(gh issue view:*),Bash(gh issue create:*),Bash(jq:*)"
+
+      - name: Skip (no commits)
+        if: steps.commits.outputs.has_commits == 'false'
+        env:
+          SINCE_HOURS: ${{ github.event.inputs.since_hours || '24' }}
+        run: echo "No PostHog upstream commits in the last $SINCE_HOURS hours. Nothing to do."
