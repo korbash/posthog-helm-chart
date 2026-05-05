@@ -8,13 +8,13 @@
   "dependencyDashboard": true,
   "enabledManagers": ["helm-values", "flux", "kubernetes"],
   "helm-values": {
-    "managerFilePatterns": ["/^manifests/.+\\.ya?ml$/"]
+    "fileMatch": ["^manifests/.+\\.ya?ml$"]
   },
   "flux": {
-    "managerFilePatterns": ["/^manifests/.+\\.ya?ml$/"]
+    "fileMatch": ["^manifests/.+\\.ya?ml$"]
   },
   "kubernetes": {
-    "managerFilePatterns": ["/^manifests/.+\\.ya?ml$/"]
+    "fileMatch": ["^manifests/.+\\.ya?ml$"]
   },
   "ignorePaths": [
     "manifests/posthog/kind-values.local.yaml"
