@@ -79,6 +79,7 @@ spec:
               name: http
           env:
             {{- include "posthog.commonEnv" . | nindent 12 }}
+            {{- include "posthog.personhogEnv" . | nindent 12 }}
             - name: USE_GRANIAN
               value: {{ .Values.web.granian.enabled | default true | quote }}
             - name: GRANIAN_WORKERS
@@ -183,6 +184,7 @@ spec:
             {{- end }}
           env:
             {{- include "posthog.commonEnv" . | nindent 12 }}
+            {{- include "posthog.personhogEnv" . | nindent 12 }}
             {{- if .Values.worker.queues }}
             - name: CELERY_WORKER_QUEUES
               value: {{ .Values.worker.queues | quote }}
