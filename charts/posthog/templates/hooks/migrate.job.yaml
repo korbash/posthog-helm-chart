@@ -29,7 +29,12 @@ spec:
             - sh
             - -c
             - |
+              set -e
+              # Postgres + product DBs
               python manage.py migrate --noinput
+              python manage.py migrate_product_databases
+              # Wait for ClickHouse system log tables before running CH migrations,
+              # since some PostHog migrations reference system.{crash_log,error_log,metric_log}.
               python -c "
               import base64, os, ssl, urllib.parse, urllib.request, time
               scheme = 'https' if os.getenv('CLICKHOUSE_SECURE','false').lower() == 'true' else 'http'
@@ -49,6 +54,11 @@ spec:
               print(f'System log tables: {n}/3')
               "
               python manage.py migrate_clickhouse
+              python manage.py sync_replicated_schema
+              # Mark noop async migrations as complete so health checks pass.
+              # Real (non-noop) async migrations are run through the UI per
+              # https://posthog.com/docs/runbook/async-migrations.
+              python manage.py run_async_migrations --complete-noop-migrations
           env:
             {{- include "posthog.commonEnv" . | nindent 12 }}
 {{- end }}
