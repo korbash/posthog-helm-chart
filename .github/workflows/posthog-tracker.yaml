@@ -6,8 +6,12 @@ on:
     - cron: "0 8 * * *"
   workflow_dispatch:
     inputs:
+      since_sha:
+        description: "Override starting SHA (default: read from .github/posthog-tracker.last-sha; falls back to 24h window)"
+        required: false
+        default: ""
       since_hours:
-        description: "How many hours back to look for upstream commits (default: 24)"
+        description: "Override window in hours (only used when since_sha is empty AND state file is missing)"
         required: false
         default: "24"
       dry_run:
@@ -21,7 +25,8 @@ concurrency:
   cancel-in-progress: true
 
 permissions:
-  contents: read
+  # contents: write so we can commit the last-scanned-SHA state file back to the repo.
+  contents: write
   issues: write
   id-token: write
 
@@ -38,31 +43,66 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           SINCE_HOURS: ${{ github.event.inputs.since_hours || '24' }}
+          SINCE_SHA_INPUT: ${{ github.event.inputs.since_sha || '' }}
         run: |
           set -euo pipefail
-          SINCE=$(date -u -d "${SINCE_HOURS} hours ago" +%Y-%m-%dT%H:%M:%SZ)
-          echo "Fetching PostHog/posthog master commits since $SINCE"
 
-          # Paginate up to 500 commits to support extended since_hours windows.
+          # Determine the cursor: explicit input > state file > 24h fallback.
+          STATE_FILE=".github/posthog-tracker.last-sha"
+          SINCE_SHA=""
+          if [ -n "$SINCE_SHA_INPUT" ]; then
+            SINCE_SHA="$SINCE_SHA_INPUT"
+            echo "Using explicit since_sha: $SINCE_SHA"
+          elif [ -f "$STATE_FILE" ]; then
+            SINCE_SHA=$(cat "$STATE_FILE" | tr -d '[:space:]')
+            echo "Using state file SHA: $SINCE_SHA"
+          fi
+
+          # Get current upstream HEAD — this becomes the new cursor on success.
+          NEW_HEAD=$(gh api repos/PostHog/posthog/commits/master --jq '.sha')
+          echo "Upstream master HEAD: $NEW_HEAD"
+
           : > /tmp/posthog-commits-raw.json
           echo "[" > /tmp/posthog-commits-raw.json
           first=true
-          for page in 1 2 3 4 5; do
-            page_data=$(gh api \
-              "repos/PostHog/posthog/commits?sha=master&since=${SINCE}&per_page=100&page=${page}" \
-              --jq '[.[] | {sha: .sha, message: .commit.message, author: .commit.author.name, date: .commit.author.date, url: .html_url}]')
-            page_count=$(echo "$page_data" | jq length)
-            [ "$page_count" -eq 0 ] && break
-            entries=$(echo "$page_data" | jq -c '.[]')
-            while IFS= read -r entry; do
-              if [ "$first" = true ]; then first=false; else echo "," >> /tmp/posthog-commits-raw.json; fi
-              echo "$entry" >> /tmp/posthog-commits-raw.json
-            done <<< "$entries"
-            [ "$page_count" -lt 100 ] && break
-          done
+
+          if [ -n "$SINCE_SHA" ]; then
+            # SHA-based: use compare API to get commits SINCE_SHA..NEW_HEAD in one call.
+            # Compare returns up to 250 commits in .commits[].
+            if [ "$SINCE_SHA" = "$NEW_HEAD" ]; then
+              echo "No new commits since last run."
+            else
+              compare=$(gh api "repos/PostHog/posthog/compare/${SINCE_SHA}...${NEW_HEAD}" 2>/dev/null || echo '{"commits":[]}')
+              entries=$(echo "$compare" | jq -c '[.commits[] | {sha: .sha, message: .commit.message, author: .commit.author.name, date: .commit.author.date, url: .html_url}] | .[]')
+              while IFS= read -r entry; do
+                [ -z "$entry" ] && continue
+                if [ "$first" = true ]; then first=false; else echo "," >> /tmp/posthog-commits-raw.json; fi
+                echo "$entry" >> /tmp/posthog-commits-raw.json
+              done <<< "$entries"
+            fi
+          else
+            # Time-window fallback (first run, no state file).
+            SINCE=$(date -u -d "${SINCE_HOURS} hours ago" +%Y-%m-%dT%H:%M:%SZ)
+            echo "No prior cursor — falling back to ${SINCE_HOURS}h window since $SINCE"
+            for page in 1 2 3 4 5; do
+              page_data=$(gh api \
+                "repos/PostHog/posthog/commits?sha=master&since=${SINCE}&per_page=100&page=${page}" \
+                --jq '[.[] | {sha: .sha, message: .commit.message, author: .commit.author.name, date: .commit.author.date, url: .html_url}]')
+              page_count=$(echo "$page_data" | jq length)
+              [ "$page_count" -eq 0 ] && break
+              entries=$(echo "$page_data" | jq -c '.[]')
+              while IFS= read -r entry; do
+                if [ "$first" = true ]; then first=false; else echo "," >> /tmp/posthog-commits-raw.json; fi
+                echo "$entry" >> /tmp/posthog-commits-raw.json
+              done <<< "$entries"
+              [ "$page_count" -lt 100 ] && break
+            done
+          fi
+
           echo "]" >> /tmp/posthog-commits-raw.json
           RAW_COUNT=$(jq length /tmp/posthog-commits-raw.json)
-          echo "Total commits in window: $RAW_COUNT"
+          echo "Total commits to scan: $RAW_COUNT"
+          echo "new_head=$NEW_HEAD" >> "$GITHUB_OUTPUT"
 
           if [ "$RAW_COUNT" -eq 0 ]; then
             echo "has_commits=false" >> "$GITHUB_OUTPUT"
@@ -179,7 +219,7 @@ jobs:
           1. New services/processes added in \`docker-compose*\` or \`charts/**\` that don't yet have a Deployment in this repo. THIS IS THE PRIMARY FOCUS.
           2. Removed or renamed services/components that this chart still references.
           3. Changes to \`bin/\` entrypoints that change CLI args, flags, or env-var contracts.
-          4. Changes to \`docker/clickhouse/config.xml\` or \`docker/clickhouse/users.xml\` (must be ported into our embedded XML).
+          4. ANY change under \`docker/clickhouse/**\` — \`config.xml\`, \`users.xml\`, AND \`config.d/*.xml\` (default.xml, coordinator.xml, data_node.xml, etc.). New \`named_collections\`, \`remote_servers\` entries, \`macros\`, or any new \`config.d\` file must be ported into our embedded XML in \`charts/posthog/templates/external/clickhouse.yaml\`. Recent example we missed: \`warpstream_calculated_events\` / \`warpstream_replay\` / \`warpstream_shared\` named collections were added in upstream's \`config.d/default.xml\`.
           5. Changes to Dockerfile *structure* — new build args, new stages, new \`COPY\`/\`RUN\` that change runtime layout, removed binaries.
 
           WHAT TO IGNORE (even if the file is in the watched list):
@@ -242,4 +282,28 @@ jobs:
         if: steps.commits.outputs.has_commits == 'false'
         env:
           SINCE_HOURS: ${{ github.event.inputs.since_hours || '24' }}
-        run: echo "No PostHog upstream commits in the last $SINCE_HOURS hours. Nothing to do."
+        run: echo "No PostHog upstream commits in the window. Nothing to do."
+
+      # Commit the new cursor only on a real scheduled/manual run, not dry-runs.
+      # If Claude opened issues, we still advance the cursor so the same commits
+      # don't get re-flagged tomorrow. If Claude failed mid-run the workflow
+      # itself fails before this step, leaving the cursor untouched (we'll
+      # re-scan the same range next time).
+      - name: Persist last-scanned SHA
+        if: success() && github.event.inputs.dry_run != 'true' && steps.commits.outputs.new_head != ''
+        env:
+          NEW_HEAD: ${{ steps.commits.outputs.new_head }}
+        run: |
+          set -euo pipefail
+          STATE_FILE=".github/posthog-tracker.last-sha"
+          mkdir -p .github
+          echo "$NEW_HEAD" > "$STATE_FILE"
+          if git diff --quiet -- "$STATE_FILE"; then
+            echo "Cursor unchanged."
+            exit 0
+          fi
+          git config user.name "posthog-tracker[bot]"
+          git config user.email "posthog-tracker@users.noreply.github.com"
+          git add "$STATE_FILE"
+          git commit -m "chore(tracker): advance cursor to ${NEW_HEAD:0:7}"
+          git push origin HEAD:main
