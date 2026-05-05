@@ -14,6 +14,7 @@ ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
     PATH=/python-runtime/bin:$PATH \
     PYTHONPATH=/python-runtime \
+    NODE_ENV=production \
     CELERY_WORKER_QUEUES=celery,stats,email,analytics_queries,analytics_limited,long_running,subscription_delivery,usage_reports,session_replay_embeddings,session_replay_general,session_replay_persistence,integrations,feature_flags,feature_flags_long_running
 
 RUN apt-get update && \
@@ -40,6 +41,16 @@ COPY --from=upstream --chown=posthog:posthog /code/ee /code/ee
 COPY --from=upstream --chown=posthog:posthog /code/common/hogvm /code/common/hogvm
 COPY --from=upstream --chown=posthog:posthog /code/common/migration_utils /code/common/migration_utils
 COPY --from=upstream --chown=posthog:posthog /code/products /code/products
+COPY --from=upstream --chown=posthog:posthog /code/frontend/src/products.json /code/frontend/src/products.json
+
+# The default celery queue runs scheduled `sync_all_remote_configs` and any
+# HogFunction transpile, both of which shell out to Node via the plugin
+# transpiler. The Temporal Django worker reuses this image and triggers the
+# same code paths.
+COPY --from=upstream --chown=posthog:posthog /code/common/plugin_transpiler /code/common/plugin_transpiler
+COPY --from=upstream --chown=posthog:posthog /code/node_modules /code/node_modules
+COPY --from=upstream /usr/local/bin/node /usr/local/bin/node
+RUN ln -s /usr/local/bin/node /usr/local/bin/nodejs
 
 USER posthog
 
