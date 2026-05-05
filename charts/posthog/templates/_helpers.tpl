@@ -866,6 +866,22 @@ Call with dict "root" .
 
 
 {{/*
+Personhog client env vars for web/worker containers.
+Renders nothing unless personhog.enabled is true. Address auto-derives from
+the in-cluster personhog-router Service when personhog.addr is unset.
+*/}}
+{{- define "posthog.personhogEnv" -}}
+{{- if .Values.personhog.enabled }}
+- name: PERSONHOG_ENABLED
+  value: "true"
+- name: PERSONHOG_ADDR
+  value: {{ .Values.personhog.addr | default (printf "http://%s-personhog-router:%v" (include "posthog.fullname" .) (.Values.personhogRouter.grpcPort | default 50052)) | quote }}
+- name: PERSONHOG_ROLLOUT_PERCENTAGE
+  value: {{ .Values.personhog.rolloutPercentage | default 0 | quote }}
+{{- end }}
+{{- end }}
+
+{{/*
 Topology spread constraints for HA - preferred spread across zones and nodes.
 Call with dict "root" . "component" "name" where name is the component label value.
 */}}

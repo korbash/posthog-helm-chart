@@ -451,3 +451,176 @@ spec:
             initialDelaySeconds: 30
             periodSeconds: 30
 {{- end }}
+
+{{- if .Values.personhogReplica.enabled }}
+## ------------------------------------------------------------------
+## Personhog Replica (Rust gRPC, reads from posthog_persons Postgres)
+## ------------------------------------------------------------------
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "posthog.fullname" . }}-personhog-replica
+  labels:
+    {{- include "posthog.componentLabels" (dict "root" . "component" "personhog-replica") | nindent 4 }}
+spec:
+  type: ClusterIP
+  ports:
+    - port: {{ .Values.personhogReplica.grpcPort | default 50051 }}
+      targetPort: grpc
+      protocol: TCP
+      name: grpc
+    - port: {{ .Values.personhogReplica.metricsPort | default 9100 }}
+      targetPort: metrics
+      protocol: TCP
+      name: metrics
+  selector:
+    {{- include "posthog.componentSelectorLabels" (dict "root" . "component" "personhog-replica") | nindent 4 }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "posthog.fullname" . }}-personhog-replica
+  labels:
+    {{- include "posthog.componentLabels" (dict "root" . "component" "personhog-replica") | nindent 4 }}
+spec:
+  replicas: {{ .Values.personhogReplica.replicas }}
+  selector:
+    matchLabels:
+      {{- include "posthog.componentSelectorLabels" (dict "root" . "component" "personhog-replica") | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "posthog.componentSelectorLabels" (dict "root" . "component" "personhog-replica") | nindent 8 }}
+      annotations:
+        {{- include "posthog.podAnnotations" (dict "root" . "component" "personhogReplica") | nindent 8 }}
+    spec:
+      serviceAccountName: {{ include "posthog.serviceAccountName" . }}
+      {{- include "posthog.imagePullSecrets" . | nindent 6 }}
+      {{- include "posthog.podSecurityContext" (dict "root" . "component" "personhogReplica") | nindent 6 }}
+      {{- include "posthog.nodeSelector" (dict "root" . "component" "personhogReplica") | nindent 6 }}
+      {{- include "posthog.tolerations" (dict "root" . "component" "personhogReplica") | nindent 6 }}
+      {{- include "posthog.affinity" (dict "root" . "component" "personhogReplica") | nindent 6 }}
+      {{- include "posthog.topologySpreadConstraints" (dict "root" . "component" "personhog-replica") | nindent 6 }}
+      containers:
+        - name: personhog-replica
+          image: "{{ .Values.personhogReplica.image.repository }}:{{ .Values.personhogReplica.image.tag }}"
+          imagePullPolicy: {{ .Values.personhogReplica.image.pullPolicy | default "Always" }}
+          {{- include "posthog.containerSecurityContext" (dict "root" . "component" "personhogReplica") | nindent 10 }}
+          ports:
+            - containerPort: {{ .Values.personhogReplica.grpcPort | default 50051 }}
+              name: grpc
+            - containerPort: {{ .Values.personhogReplica.metricsPort | default 9100 }}
+              name: metrics
+          env:
+            - name: GRPC_ADDRESS
+              value: {{ printf "0.0.0.0:%v" (.Values.personhogReplica.grpcPort | default 50051) | quote }}
+            - name: METRICS_PORT
+              value: {{ .Values.personhogReplica.metricsPort | default 9100 | quote }}
+            - name: RUST_LOG
+              value: {{ .Values.personhogReplica.rustLog | default "info" | quote }}
+            {{- include "posthog.externalPostgresqlCredentialEnv" . | nindent 12 }}
+            {{- if include "posthog.externalPostgresqlUseCredentialSecret" . }}
+            - name: PRIMARY_DATABASE_URL
+              value: {{ include "posthog.externalPostgresqlUrlValue" (dict "root" . "database" (.Values.externalPostgresql.personsDatabase | default .Values.externalPostgresql.database | default "posthog")) | quote }}
+            {{- else }}
+            - name: PRIMARY_DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "posthog.databaseSecretName" . }}
+                  key: {{ include "posthog.databaseSecretKey" . }}
+            {{- end }}
+            {{- with .Values.personhogReplica.extraEnv }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+          resources:
+            {{- toYaml .Values.personhogReplica.resources | nindent 12 }}
+          livenessProbe:
+            tcpSocket:
+              port: grpc
+            initialDelaySeconds: 30
+            periodSeconds: 30
+{{- end }}
+
+{{- if .Values.personhogRouter.enabled }}
+## ------------------------------------------------------------------
+## Personhog Router (Rust gRPC, fronts personhog-replica)
+## ------------------------------------------------------------------
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "posthog.fullname" . }}-personhog-router
+  labels:
+    {{- include "posthog.componentLabels" (dict "root" . "component" "personhog-router") | nindent 4 }}
+spec:
+  type: ClusterIP
+  ports:
+    - port: {{ .Values.personhogRouter.grpcPort | default 50052 }}
+      targetPort: grpc
+      protocol: TCP
+      name: grpc
+    - port: {{ .Values.personhogRouter.metricsPort | default 9101 }}
+      targetPort: metrics
+      protocol: TCP
+      name: metrics
+  selector:
+    {{- include "posthog.componentSelectorLabels" (dict "root" . "component" "personhog-router") | nindent 4 }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "posthog.fullname" . }}-personhog-router
+  labels:
+    {{- include "posthog.componentLabels" (dict "root" . "component" "personhog-router") | nindent 4 }}
+spec:
+  replicas: {{ .Values.personhogRouter.replicas }}
+  selector:
+    matchLabels:
+      {{- include "posthog.componentSelectorLabels" (dict "root" . "component" "personhog-router") | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "posthog.componentSelectorLabels" (dict "root" . "component" "personhog-router") | nindent 8 }}
+      annotations:
+        {{- include "posthog.podAnnotations" (dict "root" . "component" "personhogRouter") | nindent 8 }}
+    spec:
+      serviceAccountName: {{ include "posthog.serviceAccountName" . }}
+      {{- include "posthog.imagePullSecrets" . | nindent 6 }}
+      {{- include "posthog.podSecurityContext" (dict "root" . "component" "personhogRouter") | nindent 6 }}
+      {{- include "posthog.nodeSelector" (dict "root" . "component" "personhogRouter") | nindent 6 }}
+      {{- include "posthog.tolerations" (dict "root" . "component" "personhogRouter") | nindent 6 }}
+      {{- include "posthog.affinity" (dict "root" . "component" "personhogRouter") | nindent 6 }}
+      {{- include "posthog.topologySpreadConstraints" (dict "root" . "component" "personhog-router") | nindent 6 }}
+      containers:
+        - name: personhog-router
+          image: "{{ .Values.personhogRouter.image.repository }}:{{ .Values.personhogRouter.image.tag }}"
+          imagePullPolicy: {{ .Values.personhogRouter.image.pullPolicy | default "Always" }}
+          {{- include "posthog.containerSecurityContext" (dict "root" . "component" "personhogRouter") | nindent 10 }}
+          ports:
+            - containerPort: {{ .Values.personhogRouter.grpcPort | default 50052 }}
+              name: grpc
+            - containerPort: {{ .Values.personhogRouter.metricsPort | default 9101 }}
+              name: metrics
+          env:
+            - name: GRPC_ADDRESS
+              value: {{ printf "0.0.0.0:%v" (.Values.personhogRouter.grpcPort | default 50052) | quote }}
+            - name: REPLICA_URL
+              value: {{ printf "http://%s-personhog-replica:%v" (include "posthog.fullname" .) (.Values.personhogReplica.grpcPort | default 50051) | quote }}
+            - name: BACKEND_TIMEOUT_MS
+              value: {{ .Values.personhogRouter.backendTimeoutMs | default 5000 | quote }}
+            - name: METRICS_PORT
+              value: {{ .Values.personhogRouter.metricsPort | default 9101 | quote }}
+            - name: RUST_LOG
+              value: {{ .Values.personhogRouter.rustLog | default "info" | quote }}
+            {{- with .Values.personhogRouter.extraEnv }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+          resources:
+            {{- toYaml .Values.personhogRouter.resources | nindent 12 }}
+          livenessProbe:
+            tcpSocket:
+              port: grpc
+            initialDelaySeconds: 30
+            periodSeconds: 30
+{{- end }}

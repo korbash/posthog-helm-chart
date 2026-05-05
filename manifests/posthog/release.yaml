@@ -262,6 +262,22 @@ spec:
       image:
         repository: ghcr.io/posthog/posthog/cyclotron-janitor
         tag: master@sha256:c672a970c9597b94f04b721e1717a054f32073d885c9b76259b9cf33461240dc
+    ## Personhog services — disabled until we have a posthog_persons DB story.
+    ## Flip personhog.enabled (and the deployment toggles) once ready, then
+    ## bump rolloutPercentage gradually.
+    personhog:
+      enabled: false
+      rolloutPercentage: 0
+    personhogReplica:
+      enabled: false
+      image:
+        repository: ghcr.io/posthog/posthog/personhog-replica
+        tag: master
+    personhogRouter:
+      enabled: false
+      image:
+        repository: ghcr.io/posthog/posthog/personhog-router
+        tag: master
     global:
       containerSecurityContext: {}
       podSecurityContext: {}
