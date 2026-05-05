@@ -159,7 +159,7 @@ jobs:
 
       - name: Run posthog-tracker (Claude Code)
         if: steps.commits.outputs.has_commits == 'true'
-        uses: anthropics/claude-code-action@v1.0.96
+        uses: anthropics/claude-code-action@v1
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
