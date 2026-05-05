@@ -318,6 +318,15 @@ data:
         <warpstream_ingestion>
           <kafka_broker_list>{{ $kafkaBrokers }}</kafka_broker_list>
         </warpstream_ingestion>
+        <warpstream_calculated_events>
+          <kafka_broker_list>{{ $kafkaBrokers }}</kafka_broker_list>
+        </warpstream_calculated_events>
+        <warpstream_replay>
+          <kafka_broker_list>{{ $kafkaBrokers }}</kafka_broker_list>
+        </warpstream_replay>
+        <warpstream_shared>
+          <kafka_broker_list>{{ $kafkaBrokers }}</kafka_broker_list>
+        </warpstream_shared>
       </named_collections>
 
       <remote_servers>
