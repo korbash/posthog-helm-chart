@@ -92,6 +92,8 @@ spec:
           - plugins
           - temporal-django-worker
           - temporal-ui
+          - personhog-replica
+          - personhog-router
   policyTypes:
     - Ingress
   ingress:

@@ -869,9 +869,15 @@ Call with dict "root" .
 Personhog client env vars for web/worker containers.
 Renders nothing unless personhog.enabled is true. Address auto-derives from
 the in-cluster personhog-router Service when personhog.addr is unset.
+Fails template render if personhog.enabled is true but neither
+personhog.addr nor personhogRouter.enabled provides a target — prevents
+silently pointing web/worker at a non-existent Service.
 */}}
 {{- define "posthog.personhogEnv" -}}
 {{- if .Values.personhog.enabled }}
+{{- if and (not .Values.personhog.addr) (not .Values.personhogRouter.enabled) }}
+{{- fail "personhog.enabled=true requires either personhogRouter.enabled=true (in-cluster router) or personhog.addr (external endpoint)" }}
+{{- end }}
 - name: PERSONHOG_ENABLED
   value: "true"
 - name: PERSONHOG_ADDR

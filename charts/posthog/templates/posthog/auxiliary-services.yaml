@@ -484,7 +484,9 @@ metadata:
   labels:
     {{- include "posthog.componentLabels" (dict "root" . "component" "personhog-replica") | nindent 4 }}
 spec:
+  {{- if not .Values.personhogReplica.autoscaling.enabled }}
   replicas: {{ .Values.personhogReplica.replicas }}
+  {{- end }}
   selector:
     matchLabels:
       {{- include "posthog.componentSelectorLabels" (dict "root" . "component" "personhog-replica") | nindent 6 }}
@@ -502,10 +504,11 @@ spec:
       {{- include "posthog.tolerations" (dict "root" . "component" "personhogReplica") | nindent 6 }}
       {{- include "posthog.affinity" (dict "root" . "component" "personhogReplica") | nindent 6 }}
       {{- include "posthog.topologySpreadConstraints" (dict "root" . "component" "personhog-replica") | nindent 6 }}
+      terminationGracePeriodSeconds: {{ .Values.personhogReplica.terminationGracePeriodSeconds | default 30 }}
       containers:
         - name: personhog-replica
-          image: "{{ .Values.personhogReplica.image.repository }}:{{ .Values.personhogReplica.image.tag }}"
-          imagePullPolicy: {{ .Values.personhogReplica.image.pullPolicy | default "Always" }}
+          image: "{{ include "posthog.imageRef" (dict "root" . "component" "personhogReplica" "fallbackComponent" "personhogReplica") }}"
+          imagePullPolicy: {{ include "posthog.imagePullPolicy" (dict "root" . "component" "personhogReplica" "fallbackComponent" "personhogReplica") }}
           {{- include "posthog.containerSecurityContext" (dict "root" . "component" "personhogReplica") | nindent 10 }}
           ports:
             - containerPort: {{ .Values.personhogReplica.grpcPort | default 50051 }}
@@ -535,6 +538,11 @@ spec:
             {{- end }}
           resources:
             {{- toYaml .Values.personhogReplica.resources | nindent 12 }}
+          readinessProbe:
+            tcpSocket:
+              port: grpc
+            initialDelaySeconds: 5
+            periodSeconds: 10
           livenessProbe:
             tcpSocket:
               port: grpc
@@ -546,6 +554,9 @@ spec:
 ## ------------------------------------------------------------------
 ## Personhog Router (Rust gRPC, fronts personhog-replica)
 ## ------------------------------------------------------------------
+{{- if not .Values.personhogReplica.enabled }}
+{{- fail "personhogRouter.enabled=true requires personhogReplica.enabled=true so the router has a backend to route to" }}
+{{- end }}
 ---
 apiVersion: v1
 kind: Service
@@ -574,7 +585,9 @@ metadata:
   labels:
     {{- include "posthog.componentLabels" (dict "root" . "component" "personhog-router") | nindent 4 }}
 spec:
+  {{- if not .Values.personhogRouter.autoscaling.enabled }}
   replicas: {{ .Values.personhogRouter.replicas }}
+  {{- end }}
   selector:
     matchLabels:
       {{- include "posthog.componentSelectorLabels" (dict "root" . "component" "personhog-router") | nindent 6 }}
@@ -592,10 +605,11 @@ spec:
       {{- include "posthog.tolerations" (dict "root" . "component" "personhogRouter") | nindent 6 }}
       {{- include "posthog.affinity" (dict "root" . "component" "personhogRouter") | nindent 6 }}
       {{- include "posthog.topologySpreadConstraints" (dict "root" . "component" "personhog-router") | nindent 6 }}
+      terminationGracePeriodSeconds: {{ .Values.personhogRouter.terminationGracePeriodSeconds | default 30 }}
       containers:
         - name: personhog-router
-          image: "{{ .Values.personhogRouter.image.repository }}:{{ .Values.personhogRouter.image.tag }}"
-          imagePullPolicy: {{ .Values.personhogRouter.image.pullPolicy | default "Always" }}
+          image: "{{ include "posthog.imageRef" (dict "root" . "component" "personhogRouter" "fallbackComponent" "personhogRouter") }}"
+          imagePullPolicy: {{ include "posthog.imagePullPolicy" (dict "root" . "component" "personhogRouter" "fallbackComponent" "personhogRouter") }}
           {{- include "posthog.containerSecurityContext" (dict "root" . "component" "personhogRouter") | nindent 10 }}
           ports:
             - containerPort: {{ .Values.personhogRouter.grpcPort | default 50052 }}
@@ -618,6 +632,11 @@ spec:
             {{- end }}
           resources:
             {{- toYaml .Values.personhogRouter.resources | nindent 12 }}
+          readinessProbe:
+            tcpSocket:
+              port: grpc
+            initialDelaySeconds: 5
+            periodSeconds: 10
           livenessProbe:
             tcpSocket:
               port: grpc

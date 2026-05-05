@@ -272,12 +272,12 @@ spec:
       enabled: false
       image:
         repository: ghcr.io/posthog/posthog/personhog-replica
-        tag: master
+        tag: master@sha256:1a6f37ace9e4dfbeddebc78ca194a1ff78b615ff24476665f5239852c7481e7f
     personhogRouter:
       enabled: false
       image:
         repository: ghcr.io/posthog/posthog/personhog-router
-        tag: master
+        tag: master@sha256:5f4f911682d4174e6119b8383c055e5bd8d130ce65cb54e787bb9697c790c741
     global:
       containerSecurityContext: {}
       podSecurityContext: {}

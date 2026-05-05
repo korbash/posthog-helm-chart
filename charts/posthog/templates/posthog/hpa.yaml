@@ -262,3 +262,69 @@ spec:
           averageUtilization: {{ .Values.featureFlags.autoscaling.targetMemoryUtilizationPercentage }}
     {{- end }}
 {{- end }}
+{{- if and .Values.personhogReplica.enabled .Values.personhogReplica.autoscaling.enabled }}
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: {{ include "posthog.fullname" . }}-personhog-replica
+  labels:
+    {{- include "posthog.componentLabels" (dict "root" . "component" "personhog-replica") | nindent 4 }}
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: {{ include "posthog.fullname" . }}-personhog-replica
+  minReplicas: {{ .Values.personhogReplica.autoscaling.minReplicas }}
+  maxReplicas: {{ .Values.personhogReplica.autoscaling.maxReplicas }}
+  metrics:
+    {{- if .Values.personhogReplica.autoscaling.targetCPUUtilizationPercentage }}
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: {{ .Values.personhogReplica.autoscaling.targetCPUUtilizationPercentage }}
+    {{- end }}
+    {{- if .Values.personhogReplica.autoscaling.targetMemoryUtilizationPercentage }}
+    - type: Resource
+      resource:
+        name: memory
+        target:
+          type: Utilization
+          averageUtilization: {{ .Values.personhogReplica.autoscaling.targetMemoryUtilizationPercentage }}
+    {{- end }}
+{{- end }}
+{{- if and .Values.personhogRouter.enabled .Values.personhogRouter.autoscaling.enabled }}
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: {{ include "posthog.fullname" . }}-personhog-router
+  labels:
+    {{- include "posthog.componentLabels" (dict "root" . "component" "personhog-router") | nindent 4 }}
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: {{ include "posthog.fullname" . }}-personhog-router
+  minReplicas: {{ .Values.personhogRouter.autoscaling.minReplicas }}
+  maxReplicas: {{ .Values.personhogRouter.autoscaling.maxReplicas }}
+  metrics:
+    {{- if .Values.personhogRouter.autoscaling.targetCPUUtilizationPercentage }}
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: {{ .Values.personhogRouter.autoscaling.targetCPUUtilizationPercentage }}
+    {{- end }}
+    {{- if .Values.personhogRouter.autoscaling.targetMemoryUtilizationPercentage }}
+    - type: Resource
+      resource:
+        name: memory
+        target:
+          type: Utilization
+          averageUtilization: {{ .Values.personhogRouter.autoscaling.targetMemoryUtilizationPercentage }}
+    {{- end }}
+{{- end }}
