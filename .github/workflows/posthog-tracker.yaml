@@ -165,8 +165,10 @@ jobs:
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           prompt: ${{ steps.build_prompt.outputs.prompt }}
+          show_full_output: true
           claude_args: |
             --model claude-opus-4-7
+            --verbose
             --allowed-tools "Bash(gh api:*),Bash(gh issue list:*),Bash(gh issue view:*),Bash(gh issue create:*),Bash(jq:*)"
 
       - name: Skip (no commits)
