@@ -1,0 +1,53 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": [
+    "config:recommended",
+    ":semanticCommits",
+    ":disableRateLimiting"
+  ],
+  "dependencyDashboard": true,
+  "enabledManagers": ["helm-values", "flux", "kubernetes"],
+  "helm-values": {
+    "managerFilePatterns": ["/^manifests/.+\\.ya?ml$/"]
+  },
+  "flux": {
+    "managerFilePatterns": ["/^manifests/.+\\.ya?ml$/"]
+  },
+  "kubernetes": {
+    "managerFilePatterns": ["/^manifests/.+\\.ya?ml$/"]
+  },
+  "ignorePaths": [
+    "manifests/posthog/kind-values.local.yaml"
+  ],
+  "packageRules": [
+    {
+      "description": "Bundle every image update from the PostHog HelmRelease values into one PR.",
+      "matchFileNames": ["manifests/posthog/release.yaml"],
+      "matchDatasources": ["docker"],
+      "groupName": "posthog images",
+      "groupSlug": "posthog-images",
+      "separateMajorMinor": false,
+      "separateMultipleMajor": false,
+      "separateMinorPatch": false,
+      "commitMessageTopic": "posthog images",
+      "addLabels": ["renovate/posthog-images"]
+    },
+    {
+      "description": "Pin floating tags (latest, master) in the PostHog release so Renovate can track digests.",
+      "matchFileNames": ["manifests/posthog/release.yaml"],
+      "matchDatasources": ["docker"],
+      "pinDigests": true
+    },
+    {
+      "description": "Helm chart bumps (cnpg, cert-manager, redpanda-operator, altinity-clickhouse-operator, …) get one PR per chart.",
+      "matchDatasources": ["helm"],
+      "addLabels": ["renovate/helm"]
+    },
+    {
+      "description": "No auto-merge anywhere.",
+      "matchPackageNames": ["*"],
+      "automerge": false,
+      "platformAutomerge": false
+    }
+  ]
+}
