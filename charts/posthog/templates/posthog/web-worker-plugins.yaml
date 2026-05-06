@@ -89,6 +89,15 @@ spec:
             - --workers
             - {{ .Values.web.granian.workers | default 2 | quote }}
             - posthog.asgi:application
+          {{- else }}
+          ## Web pod runs only the server. Migrations are handled by the
+          ## migrate Helm hook; workers are separate Deployments. Skipping
+          ## the image's bin/docker orchestrator avoids duplicating that
+          ## work (which adds ~5min to every web pod startup) and stops
+          ## bin/docker-worker from spawning broken nodejs sidecars in the
+          ## web pod.
+          command:
+            - ./bin/docker-server
           {{- end }}
           ports:
             - containerPort: 8000
