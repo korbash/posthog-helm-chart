@@ -150,6 +150,25 @@ spec:
     matchLabels:
       {{- include "posthog.componentSelectorLabels" (dict "root" . "component" "feature-flags") | nindent 6 }}
 {{- end }}
+{{- if .Values.hypercacheServer.podDisruptionBudget.enabled }}
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: {{ include "posthog.fullname" . }}-hypercache-server
+  labels:
+    {{- include "posthog.componentLabels" (dict "root" . "component" "hypercache-server") | nindent 4 }}
+spec:
+  {{- if .Values.hypercacheServer.podDisruptionBudget.minAvailable }}
+  minAvailable: {{ .Values.hypercacheServer.podDisruptionBudget.minAvailable }}
+  {{- end }}
+  {{- if .Values.hypercacheServer.podDisruptionBudget.maxUnavailable }}
+  maxUnavailable: {{ .Values.hypercacheServer.podDisruptionBudget.maxUnavailable }}
+  {{- end }}
+  selector:
+    matchLabels:
+      {{- include "posthog.componentSelectorLabels" (dict "root" . "component" "hypercache-server") | nindent 6 }}
+{{- end }}
 {{- if .Values.temporalDjangoWorker.podDisruptionBudget.enabled }}
 ---
 apiVersion: policy/v1

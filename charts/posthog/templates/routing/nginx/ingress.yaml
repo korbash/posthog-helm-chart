@@ -112,6 +112,30 @@ spec:
                 port:
                   number: 3001
           {{- end }}
+          {{- if .Values.hypercacheServer.enabled }}
+          ## Surveys and remote config -> hypercache-server service
+          - path: /surveys(/|$)(.*)
+            pathType: ImplementationSpecific
+            backend:
+              service:
+                name: {{ include "posthog.fullname" . }}-hypercache-server
+                port:
+                  number: {{ .Values.hypercacheServer.port | default 3002 }}
+          - path: /api/surveys(/|$)(.*)
+            pathType: ImplementationSpecific
+            backend:
+              service:
+                name: {{ include "posthog.fullname" . }}-hypercache-server
+                port:
+                  number: {{ .Values.hypercacheServer.port | default 3002 }}
+          - path: /array(/|$)(.*)
+            pathType: ImplementationSpecific
+            backend:
+              service:
+                name: {{ include "posthog.fullname" . }}-hypercache-server
+                port:
+                  number: {{ .Values.hypercacheServer.port | default 3002 }}
+          {{- end }}
           {{- if .Values.livestream.enabled }}
           ## Livestream endpoint -> livestream service (WebSocket)
           - path: /livestream(/|$)(.*)
@@ -125,6 +149,13 @@ spec:
           {{- if .Values.plugins.enabled }}
           ## Public webhooks -> plugins service
           - path: /public/webhooks(/|$)(.*)
+            pathType: ImplementationSpecific
+            backend:
+              service:
+                name: {{ include "posthog.fullname" . }}-plugins
+                port:
+                  number: 6738
+          - path: /public/m(/|$)(.*)
             pathType: ImplementationSpecific
             backend:
               service:

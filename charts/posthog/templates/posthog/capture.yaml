@@ -46,6 +46,10 @@ spec:
       {{- include "posthog.tolerations" (dict "root" . "component" "capture") | nindent 6 }}
       {{- include "posthog.affinity" (dict "root" . "component" "capture") | nindent 6 }}
       {{- include "posthog.topologySpreadConstraints" (dict "root" . "component" "capture") | nindent 6 }}
+      {{- if .Values.redis.enabled }}
+      initContainers:
+        {{- include "posthog.redisInitContainer" (dict "root" .) | nindent 8 }}
+      {{- end }}
       containers:
         - name: capture
           image: "{{ .Values.capture.image.repository }}:{{ .Values.capture.image.tag }}"
@@ -129,6 +133,10 @@ spec:
       {{- include "posthog.tolerations" (dict "root" . "component" "replayCapture") | nindent 6 }}
       {{- include "posthog.affinity" (dict "root" . "component" "replayCapture") | nindent 6 }}
       {{- include "posthog.topologySpreadConstraints" (dict "root" . "component" "replay-capture") | nindent 6 }}
+      {{- if .Values.redis.enabled }}
+      initContainers:
+        {{- include "posthog.redisInitContainer" (dict "root" .) | nindent 8 }}
+      {{- end }}
       containers:
         - name: replay-capture
           image: "{{ .Values.replayCapture.image.repository }}:{{ .Values.replayCapture.image.tag }}"
@@ -209,6 +217,10 @@ spec:
       {{- include "posthog.nodeSelector" (dict "root" . "component" "captureAi") | nindent 6 }}
       {{- include "posthog.tolerations" (dict "root" . "component" "captureAi") | nindent 6 }}
       {{- include "posthog.affinity" (dict "root" . "component" "captureAi") | nindent 6 }}
+      {{- if .Values.redis.enabled }}
+      initContainers:
+        {{- include "posthog.redisInitContainer" (dict "root" .) | nindent 8 }}
+      {{- end }}
       containers:
         - name: capture-ai
           image: "{{ .Values.captureAi.image.repository }}:{{ .Values.captureAi.image.tag }}"

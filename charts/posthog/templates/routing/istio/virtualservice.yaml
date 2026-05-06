@@ -69,6 +69,18 @@ spec:
             port:
               number: 3001
     {{- end }}
+    {{- if .Values.hypercacheServer.enabled }}
+    ## Surveys and remote config -> hypercache-server service
+    - match:
+{{ include "posthog.istioPathMatches" "/surveys" | indent 8 }}
+{{ include "posthog.istioPathMatches" "/api/surveys" | indent 8 }}
+{{ include "posthog.istioPathMatches" "/array" | indent 8 }}
+      route:
+        - destination:
+            host: {{ include "posthog.fullname" . }}-hypercache-server
+            port:
+              number: {{ .Values.hypercacheServer.port | default 3002 }}
+    {{- end }}
     {{- if .Values.livestream.enabled }}
     ## Livestream -> livestream service (WebSocket)
     - match:
@@ -85,6 +97,7 @@ spec:
     ## Public webhooks -> plugins service
     - match:
 {{ include "posthog.istioPathMatches" "/public/webhooks" | indent 8 }}
+{{ include "posthog.istioPathMatches" "/public/m" | indent 8 }}
       route:
         - destination:
             host: {{ include "posthog.fullname" . }}-plugins

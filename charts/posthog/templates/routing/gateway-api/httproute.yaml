@@ -57,10 +57,24 @@ spec:
         - name: {{ include "posthog.fullname" . }}-feature-flags
           port: 3001
     {{- end }}
-    {{- if .Values.livestream.enabled }}
-    ## Livestream -> livestream service (WebSocket)
+    {{- if .Values.hypercacheServer.enabled }}
+    ## Surveys and remote config -> hypercache-server service
     - matches:
-{{ include "posthog.gatewayPathMatches" "/livestream" | indent 8 }}
+{{ include "posthog.gatewayPathMatches" "/surveys" | indent 8 }}
+{{ include "posthog.gatewayPathMatches" "/api/surveys" | indent 8 }}
+{{ include "posthog.gatewayPathMatches" "/array" | indent 8 }}
+      backendRefs:
+        - name: {{ include "posthog.fullname" . }}-hypercache-server
+          port: {{ .Values.hypercacheServer.port | default 3002 }}
+    {{- end }}
+    {{- if .Values.livestream.enabled }}
+    ## Livestream -> livestream service (WebSocket).
+    ## URLRewrite with ReplacePrefixMatch requires exactly one PathPrefix match
+    ## per Gateway API spec, so the rule deliberately omits the usual Exact pair.
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /livestream
       filters:
         - type: URLRewrite
           urlRewrite:
@@ -75,6 +89,7 @@ spec:
     ## Public webhooks -> plugins service
     - matches:
 {{ include "posthog.gatewayPathMatches" "/public/webhooks" | indent 8 }}
+{{ include "posthog.gatewayPathMatches" "/public/m" | indent 8 }}
       backendRefs:
         - name: {{ include "posthog.fullname" . }}-plugins
           port: 6738

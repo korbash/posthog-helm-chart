@@ -15,7 +15,7 @@ spec:
           secretKeyRef:
             name: posthog-clickhouse-password
             key: password
-      default/default_database: posthog
+      default/default_database: default
       default/networks/ip: "::/0"
       default/profile: default
       default/quota: default
@@ -28,7 +28,7 @@ spec:
           secretKeyRef:
             name: posthog-clickhouse-password
             key: password
-      api/default_database: posthog
+      api/default_database: default
       api/networks/ip: "::/0"
       api/profile: api
       api/quota: default
@@ -37,7 +37,7 @@ spec:
           secretKeyRef:
             name: posthog-clickhouse-password
             key: password
-      app/default_database: posthog
+      app/default_database: default
       app/networks/ip: "::/0"
       app/profile: app
       app/quota: default
@@ -204,6 +204,15 @@ spec:
             <warpstream_ingestion>
               <kafka_broker_list from_env="KAFKA_HOSTS"/>
             </warpstream_ingestion>
+            <warpstream_calculated_events>
+              <kafka_broker_list from_env="KAFKA_HOSTS"/>
+            </warpstream_calculated_events>
+            <warpstream_replay>
+              <kafka_broker_list from_env="KAFKA_HOSTS"/>
+            </warpstream_replay>
+            <warpstream_shared>
+              <kafka_broker_list from_env="KAFKA_HOSTS"/>
+            </warpstream_shared>
           </named_collections>
         </clickhouse>
   templates:
@@ -212,11 +221,18 @@ spec:
         spec:
           containers:
             - name: clickhouse
-              image: ghcr.io/blitss/posthog-clickhouse:25.9.7
-              imagePullPolicy: Always
+              image: ghcr.io/blitss/posthog-clickhouse:26.4
+              imagePullPolicy: IfNotPresent
               env:
                 - name: CLICKHOUSE_DB
                   value: posthog
+                - name: CLICKHOUSE_ALWAYS_RUN_INITDB_SCRIPTS
+                  value: "1"
+                - name: CLICKHOUSE_PASSWORD
+                  valueFrom:
+                    secretKeyRef:
+                      name: posthog-clickhouse-password
+                      key: password
                 - name: KAFKA_HOSTS
                   value: posthog-redpanda.posthog.svc.cluster.local:9093
               volumeMounts:

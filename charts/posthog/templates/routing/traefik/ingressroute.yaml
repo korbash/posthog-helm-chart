@@ -53,6 +53,14 @@ spec:
         - name: {{ include "posthog.fullname" . }}-feature-flags
           port: 3001
     {{- end }}
+    {{- if .Values.hypercacheServer.enabled }}
+    ## Surveys and remote config -> hypercache-server service
+    - match: Host(`{{ .Values.ingress.hostname }}`) && ({{ include "posthog.traefikPathRule" "/surveys" }} || {{ include "posthog.traefikPathRule" "/api/surveys" }} || {{ include "posthog.traefikPathRule" "/array" }})
+      kind: Rule
+      services:
+        - name: {{ include "posthog.fullname" . }}-hypercache-server
+          port: {{ .Values.hypercacheServer.port | default 3002 }}
+    {{- end }}
     {{- if .Values.livestream.enabled }}
     ## Livestream -> livestream service (WebSocket)
     - match: Host(`{{ .Values.ingress.hostname }}`) && {{ include "posthog.traefikPathRule" "/livestream" }}
@@ -65,7 +73,7 @@ spec:
     {{- end }}
     {{- if .Values.plugins.enabled }}
     ## Public webhooks -> plugins service
-    - match: Host(`{{ .Values.ingress.hostname }}`) && {{ include "posthog.traefikPathRule" "/public/webhooks" }}
+    - match: Host(`{{ .Values.ingress.hostname }}`) && ({{ include "posthog.traefikPathRule" "/public/webhooks" }} || {{ include "posthog.traefikPathRule" "/public/m" }})
       kind: Rule
       services:
         - name: {{ include "posthog.fullname" . }}-plugins

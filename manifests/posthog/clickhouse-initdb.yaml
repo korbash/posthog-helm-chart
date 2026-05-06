@@ -16,17 +16,20 @@ data:
         ;;
     esac
 
+    CLICKHOUSE_CLIENT=(clickhouse client --database system --password "${CLICKHOUSE_PASSWORD:-}" -n)
+
     echo "Creating ${CLICKHOUSE_DB} database..."
-    clickhouse client -n <<-EOSQL
+    "${CLICKHOUSE_CLIENT[@]}" <<-EOSQL
       CREATE DATABASE IF NOT EXISTS ${CLICKHOUSE_DB};
     EOSQL
 
     echo "Flushing logs to create system log tables..."
-    clickhouse client --query "SYSTEM FLUSH LOGS"
+    clickhouse client --database system --password "${CLICKHOUSE_PASSWORD:-}" --query "SYSTEM FLUSH LOGS"
 
     echo "Waiting for system log tables..."
+    READY=0
     for i in $(seq 1 30); do
-      COUNT=$(clickhouse client --query "
+      COUNT=$(clickhouse client --database system --password "${CLICKHOUSE_PASSWORD:-}" --query "
         SELECT count()
         FROM system.tables
         WHERE database = 'system'
@@ -34,11 +37,14 @@ data:
       ")
       if [ "$COUNT" = "3" ]; then
         echo "System log tables ready"
-        exit 0
+        READY=1
+        break
       fi
       echo "  $COUNT/3 tables ready, retrying in 2s..."
       sleep 2
     done
 
-    echo "Timed out waiting for system log tables" >&2
-    exit 1
+    if [ "$READY" != "1" ]; then
+      echo "Timed out waiting for system log tables" >&2
+      exit 1
+    fi

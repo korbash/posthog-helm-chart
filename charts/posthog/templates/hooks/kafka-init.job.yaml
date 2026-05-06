@@ -25,13 +25,24 @@ spec:
       restartPolicy: OnFailure
       containers:
         - name: kafka-init
-          image: bitnamilegacy/kafka:3.7
+          image: "{{ .Values.kafkaInit.image.repository }}:{{ .Values.kafkaInit.image.tag }}"
+          imagePullPolicy: {{ .Values.kafkaInit.image.pullPolicy | default "IfNotPresent" }}
           command:
             - sh
-            - -c
+            - -ec
             - |
+              deadline=$(( $(date +%s) + 300 ))
+              until kafka-topics.sh --bootstrap-server {{ $kafkaBrokers }} --list >/dev/null; do
+                if [ "$(date +%s)" -ge "${deadline}" ]; then
+                  echo "timed out waiting for Kafka brokers: {{ $kafkaBrokers }}" >&2
+                  exit 1
+                fi
+                echo "Kafka brokers not ready, retrying in 5s..."
+                sleep 5
+              done
+
               {{- range .Values.kafkaInit.topics }}
-              kafka-topics.sh --bootstrap-server {{ $kafkaBrokers }} --create --if-not-exists --topic {{ . }} || true
+              kafka-topics.sh --bootstrap-server {{ $kafkaBrokers }} --create --if-not-exists --topic {{ . }}
               {{- end }}
               echo "All topics created successfully."
 {{- end }}

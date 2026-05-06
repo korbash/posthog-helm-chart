@@ -124,7 +124,7 @@ kubectl exec -n posthog "$WEB" -- python -c \
   "import urllib.request, json; print(json.dumps(json.loads(urllib.request.urlopen('http://localhost:8000/_preflight/').read()), indent=2))"
 ```
 
-Every infra component should be `true`: `django`, `db`, `clickhouse`, `kafka`, `redis`, `plugins`, `celery`, `object_storage`. Expected fails on a fresh self-host install: `cloud`, `demo`, `email_service_available`, `initiated`.
+Every active infra component should be `true`: `django`, `db`, `clickhouse`, `redis`, `plugins`, `celery`, `object_storage`. Current PostHog self-host preflight returns `kafka: false` by code path (`kafka = in_cloud or settings.TEST`), so validate Kafka separately with Redpanda health/topic checks. Expected false values on a fresh self-host install: `cloud`, `demo`, `email_service_available`, `initiated`, and `kafka`.
 
 ## Key design decisions
 

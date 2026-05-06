@@ -15,7 +15,7 @@ spec:
     - Ingress
   ingress: []
 ---
-## Allow ingress controller to reach web, capture, replay-capture, feature-flags, livestream, plugins
+## Allow ingress controller to reach public HTTP services
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
@@ -33,9 +33,13 @@ spec:
           - web
           - capture
           - replay-capture
+          - capture-ai
+          - capture-logs
           - feature-flags
+          - hypercache-server
           - livestream
           - plugins
+          - rustfs
   policyTypes:
     - Ingress
   ingress:
@@ -92,6 +96,7 @@ spec:
           - plugins
           - temporal-django-worker
           - temporal-ui
+          - hypercache-server
           - personhog-replica
           - personhog-router
   policyTypes:

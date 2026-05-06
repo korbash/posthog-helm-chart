@@ -131,6 +131,91 @@ spec:
       {{- end }}
 {{- end }}
 
+{{- if .Values.hypercacheServer.enabled }}
+## ------------------------------------------------------------------
+## Hypercache Server (Rust - surveys and remote config)
+## ------------------------------------------------------------------
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "posthog.fullname" . }}-hypercache-server
+  labels:
+    {{- include "posthog.componentLabels" (dict "root" . "component" "hypercache-server") | nindent 4 }}
+spec:
+  type: ClusterIP
+  ports:
+    - port: {{ .Values.hypercacheServer.port | default 3002 }}
+      targetPort: {{ .Values.hypercacheServer.port | default 3002 }}
+      protocol: TCP
+      name: http
+  selector:
+    {{- include "posthog.componentSelectorLabels" (dict "root" . "component" "hypercache-server") | nindent 4 }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "posthog.fullname" . }}-hypercache-server
+  labels:
+    {{- include "posthog.componentLabels" (dict "root" . "component" "hypercache-server") | nindent 4 }}
+spec:
+  {{- if not .Values.hypercacheServer.autoscaling.enabled }}
+  replicas: {{ .Values.hypercacheServer.replicas }}
+  {{- end }}
+  selector:
+    matchLabels:
+      {{- include "posthog.componentSelectorLabels" (dict "root" . "component" "hypercache-server") | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "posthog.componentSelectorLabels" (dict "root" . "component" "hypercache-server") | nindent 8 }}
+      annotations:
+        {{- include "posthog.podAnnotations" (dict "root" . "component" "hypercacheServer") | nindent 8 }}
+    spec:
+      serviceAccountName: {{ include "posthog.serviceAccountName" . }}
+      {{- include "posthog.imagePullSecrets" . | nindent 6 }}
+      {{- include "posthog.podSecurityContext" (dict "root" . "component" "hypercacheServer") | nindent 6 }}
+      {{- include "posthog.nodeSelector" (dict "root" . "component" "hypercacheServer") | nindent 6 }}
+      {{- include "posthog.tolerations" (dict "root" . "component" "hypercacheServer") | nindent 6 }}
+      {{- include "posthog.affinity" (dict "root" . "component" "hypercacheServer") | nindent 6 }}
+      {{- include "posthog.topologySpreadConstraints" (dict "root" . "component" "hypercache-server") | nindent 6 }}
+      {{- if .Values.redis.enabled }}
+      initContainers:
+        {{- include "posthog.redisInitContainer" (dict "root" .) | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: hypercache-server
+          image: "{{ .Values.hypercacheServer.image.repository }}:{{ .Values.hypercacheServer.image.tag }}"
+          imagePullPolicy: {{ .Values.hypercacheServer.image.pullPolicy | default "Always" }}
+          {{- include "posthog.containerSecurityContext" (dict "root" . "component" "hypercacheServer") | nindent 10 }}
+          ports:
+            - containerPort: {{ .Values.hypercacheServer.port | default 3002 }}
+              name: http
+          env:
+            - name: ADDRESS
+              value: {{ printf "0.0.0.0:%v" (.Values.hypercacheServer.port | default 3002) | quote }}
+            - name: RUST_LOG
+              value: {{ .Values.hypercacheServer.rustLog | default "info" | quote }}
+            {{- include "posthog.commonEnv" . | nindent 12 }}
+            {{- with .Values.hypercacheServer.extraEnv }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+          resources:
+            {{- toYaml .Values.hypercacheServer.resources | nindent 12 }}
+          readinessProbe:
+            httpGet:
+              path: /_readiness
+              port: {{ .Values.hypercacheServer.port | default 3002 }}
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /_readiness
+              port: {{ .Values.hypercacheServer.port | default 3002 }}
+            initialDelaySeconds: 30
+            periodSeconds: 15
+{{- end }}
+
 {{- if .Values.propertyDefsRs.enabled }}
 ## ------------------------------------------------------------------
 ## Property Definitions service (Rust)
@@ -161,6 +246,10 @@ spec:
       {{- include "posthog.tolerations" (dict "root" . "component" "propertyDefsRs") | nindent 6 }}
       {{- include "posthog.affinity" (dict "root" . "component" "propertyDefsRs") | nindent 6 }}
       {{- include "posthog.topologySpreadConstraints" (dict "root" . "component" "property-defs-rs") | nindent 6 }}
+      {{- if .Values.redis.enabled }}
+      initContainers:
+        {{- include "posthog.redisInitContainer" (dict "root" .) | nindent 8 }}
+      {{- end }}
       containers:
         - name: property-defs-rs
           image: "{{ .Values.propertyDefsRs.image.repository }}:{{ .Values.propertyDefsRs.image.tag }}"
@@ -334,9 +423,37 @@ spec:
       {{- include "posthog.tolerations" (dict "root" . "component" "cymbal") | nindent 6 }}
       {{- include "posthog.affinity" (dict "root" . "component" "cymbal") | nindent 6 }}
       {{- include "posthog.topologySpreadConstraints" (dict "root" . "component" "cymbal") | nindent 6 }}
-      {{- if .Values.geoip.enabled }}
+      {{- if or .Values.geoip.enabled .Values.rustfs.enabled }}
       initContainers:
+        {{- if .Values.geoip.enabled }}
         {{- include "posthog.geoipInitContainer" (dict "root" .) | nindent 8 }}
+        {{- end }}
+        {{- if .Values.rustfs.enabled }}
+        - name: ensure-object-storage-bucket
+          image: "{{ .Values.rustfs.image.clientImage.repository }}:{{ .Values.rustfs.image.clientImage.tag }}"
+          imagePullPolicy: {{ .Values.rustfs.image.clientImage.pullPolicy | default "IfNotPresent" }}
+          env:
+            - name: MC_CONFIG_DIR
+              value: /tmp/.mc
+            - name: RUSTFS_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "posthog.secretName" . }}
+                  key: object-storage-access-key
+            - name: RUSTFS_SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "posthog.secretName" . }}
+                  key: object-storage-secret-key
+          command:
+            - sh
+            - -ec
+            - |
+              until mc alias set rustfs http://{{ include "posthog.fullname" . }}-rustfs-svc:9000 "$RUSTFS_ACCESS_KEY" "$RUSTFS_SECRET_KEY" && mc mb --ignore-existing rustfs/posthog && mc ls rustfs/posthog >/dev/null; do
+                echo "rustfs bucket not ready, retrying in 5s..."
+                sleep 5
+              done
+        {{- end }}
       {{- end }}
       containers:
         - name: cymbal

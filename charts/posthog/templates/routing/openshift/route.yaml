@@ -226,6 +226,44 @@ spec:
   {{- end }}
 {{- end }}
 
+{{- if .Values.hypercacheServer.enabled }}
+{{- range $name, $path := dict "surveys" "/surveys" "api-surveys" "/api/surveys" "array" "/array" }}
+---
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  name: {{ $fullname }}-hypercache-{{ $name }}
+  labels:
+    {{- $labels | nindent 4 }}
+  {{- with $annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  host: {{ $hostname | quote }}
+  path: {{ $path }}
+  to:
+    kind: Service
+    name: {{ $fullname }}-hypercache-server
+  port:
+    targetPort: {{ $.Values.hypercacheServer.port | default 3002 }}
+  {{- with $tls }}
+  tls:
+    termination: {{ .termination | default "edge" }}
+    insecureEdgeTerminationPolicy: {{ .insecureEdgeTerminationPolicy | default "Redirect" }}
+    {{- if .certificate }}
+    certificate: {{ .certificate | quote }}
+    {{- end }}
+    {{- if .key }}
+    key: {{ .key | quote }}
+    {{- end }}
+    {{- if .caCertificate }}
+    caCertificate: {{ .caCertificate | quote }}
+    {{- end }}
+  {{- end }}
+{{- end }}
+{{- end }}
+
 {{- if .Values.livestream.enabled }}
 ---
 apiVersion: route.openshift.io/v1
@@ -263,11 +301,12 @@ spec:
 {{- end }}
 
 {{- if .Values.plugins.enabled }}
+{{- range $name, $path := dict "webhooks" "/public/webhooks" "public-m" "/public/m" }}
 ---
 apiVersion: route.openshift.io/v1
 kind: Route
 metadata:
-  name: {{ $fullname }}-plugins
+  name: {{ $fullname }}-plugins-{{ $name }}
   labels:
     {{- $labels | nindent 4 }}
   {{- with $annotations }}
@@ -276,7 +315,7 @@ metadata:
   {{- end }}
 spec:
   host: {{ $hostname | quote }}
-  path: /public/webhooks
+  path: {{ $path }}
   to:
     kind: Service
     name: {{ $fullname }}-plugins
@@ -296,6 +335,7 @@ spec:
     caCertificate: {{ .caCertificate | quote }}
     {{- end }}
   {{- end }}
+{{- end }}
 {{- end }}
 
 ---

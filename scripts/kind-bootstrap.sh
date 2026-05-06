@@ -14,12 +14,14 @@ MIRROR_HOST="${MIRROR_HOST:-}"
 RECREATE=0
 INSTALL_POSTHOG=0
 LOAD_LOCAL_IMAGES=1
+CLICKHOUSE_IMAGE="${CLICKHOUSE_IMAGE:-ghcr.io/blitss/posthog-clickhouse:26.4}"
 
 LOCAL_IMAGES=(
   "local/posthog-migrate:test"
   "local/posthog-web:test"
   "local/posthog-worker:test"
   "local/posthog-worker-exports:test"
+  "${CLICKHOUSE_IMAGE}"
 )
 
 usage() {
@@ -91,6 +93,11 @@ configure_node_mirrors() {
 load_local_images() {
   local available=()
   local image
+
+  if ! docker image inspect "${CLICKHOUSE_IMAGE}" >/dev/null 2>&1; then
+    echo "building ${CLICKHOUSE_IMAGE} for kind ClickHouse UDF support" >&2
+    docker build -f "${REPO_ROOT}/images/clickhouse/Dockerfile" -t "${CLICKHOUSE_IMAGE}" "${REPO_ROOT}"
+  fi
 
   for image in "${LOCAL_IMAGES[@]}"; do
     if docker image inspect "${image}" >/dev/null 2>&1; then

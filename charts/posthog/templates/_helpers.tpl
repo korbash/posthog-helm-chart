@@ -817,13 +817,48 @@ Redis URL builder
 {{- end }}
 
 {{/*
+Redis init container for services that fail hard if Redis is not accepting
+connections during process startup.
+Call with dict "root" .
+*/}}
+{{- define "posthog.redisInitContainer" -}}
+{{- if .root.Values.redis.enabled }}
+- name: wait-for-redis
+  image: busybox:1.37
+  command:
+    - /bin/sh
+    - -ec
+    - |
+      deadline=$(( $(date +%s) + 300 ))
+      until nc -z "{{ include "posthog.fullname" .root }}-redis" 6379; do
+        if [ "$(date +%s)" -ge "${deadline}" ]; then
+          echo "timed out waiting for Redis" >&2
+          exit 1
+        fi
+        sleep 2
+      done
+{{- end }}
+{{- end }}
+
+{{/*
 GeoIP init container - downloads MMDB from the central geoip service.
 Call with dict "root" .
 */}}
 {{- define "posthog.geoipInitContainer" -}}
 - name: download-geoip
-  image: busybox
-  command: ["wget", "-O", "/share/{{ .root.Values.geoip.filename }}", "http://{{ include "posthog.fullname" .root }}-geoip:8080/{{ .root.Values.geoip.filename }}"]
+  image: busybox:1.37
+  command:
+    - /bin/sh
+    - -ec
+    - |
+      deadline=$(( $(date +%s) + 300 ))
+      until wget -O "/share/{{ .root.Values.geoip.filename }}" "http://{{ include "posthog.fullname" .root }}-geoip:8080/{{ .root.Values.geoip.filename }}"; do
+        if [ "$(date +%s)" -ge "${deadline}" ]; then
+          echo "timed out waiting for GeoIP database" >&2
+          exit 1
+        fi
+        sleep 2
+      done
   volumeMounts:
     - name: geoip-db
       mountPath: /share

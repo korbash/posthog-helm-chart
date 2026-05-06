@@ -262,6 +262,39 @@ spec:
           averageUtilization: {{ .Values.featureFlags.autoscaling.targetMemoryUtilizationPercentage }}
     {{- end }}
 {{- end }}
+{{- if .Values.hypercacheServer.autoscaling.enabled }}
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: {{ include "posthog.fullname" . }}-hypercache-server
+  labels:
+    {{- include "posthog.componentLabels" (dict "root" . "component" "hypercache-server") | nindent 4 }}
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: {{ include "posthog.fullname" . }}-hypercache-server
+  minReplicas: {{ .Values.hypercacheServer.autoscaling.minReplicas }}
+  maxReplicas: {{ .Values.hypercacheServer.autoscaling.maxReplicas }}
+  metrics:
+    {{- if .Values.hypercacheServer.autoscaling.targetCPUUtilizationPercentage }}
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: {{ .Values.hypercacheServer.autoscaling.targetCPUUtilizationPercentage }}
+    {{- end }}
+    {{- if .Values.hypercacheServer.autoscaling.targetMemoryUtilizationPercentage }}
+    - type: Resource
+      resource:
+        name: memory
+        target:
+          type: Utilization
+          averageUtilization: {{ .Values.hypercacheServer.autoscaling.targetMemoryUtilizationPercentage }}
+    {{- end }}
+{{- end }}
 {{- if and .Values.personhogReplica.enabled .Values.personhogReplica.autoscaling.enabled }}
 ---
 apiVersion: autoscaling/v2

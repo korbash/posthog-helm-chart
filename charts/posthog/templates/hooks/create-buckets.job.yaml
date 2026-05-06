@@ -20,7 +20,8 @@ spec:
       restartPolicy: OnFailure
       containers:
         - name: create-buckets
-          image: minio/mc:latest
+          image: "{{ .Values.rustfs.image.clientImage.repository }}:{{ .Values.rustfs.image.clientImage.tag }}"
+          imagePullPolicy: {{ .Values.rustfs.image.clientImage.pullPolicy | default "IfNotPresent" }}
           env:
             - name: MC_CONFIG_DIR
               value: /tmp/.mc
@@ -36,21 +37,17 @@ spec:
                   key: object-storage-secret-key
           command:
             - sh
-            - -c
+            - -ec
             - |
-              check() {
-                echo "Checking $1:$2 ..."
-                while ! nc -z "$1" "$2"; do
-                  echo "  $1:$2 not ready, retrying in 5s..."
-                  sleep 5
-                done
-                echo "  $1:$2 is up"
-              }
+              until mc alias set rustfs http://{{ include "posthog.fullname" . }}-rustfs-svc:9000 "$RUSTFS_ACCESS_KEY" "$RUSTFS_SECRET_KEY" && mc ls rustfs >/dev/null; do
+                echo "rustfs not ready, retrying in 5s..."
+                sleep 5
+              done
 
-              check {{ include "posthog.fullname" . }}-rustfs-svc 9000
-
-              mc alias set rustfs http://{{ include "posthog.fullname" . }}-rustfs-svc:9000 "$RUSTFS_ACCESS_KEY" "$RUSTFS_SECRET_KEY"
               mc mb --ignore-existing rustfs/posthog
+              mc mb --ignore-existing rustfs/ai-blobs
+              mc ls rustfs/posthog >/dev/null
+              mc ls rustfs/ai-blobs >/dev/null
               mc ls rustfs/
               echo "Buckets ready."
 {{- end }}

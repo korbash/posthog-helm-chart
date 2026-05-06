@@ -5,7 +5,7 @@ metadata:
   namespace: posthog
 spec:
   interval: 5m
-  timeout: 15m
+  timeout: 45m
   chartRef:
     kind: OCIRepository
     name: posthog-chart
@@ -19,6 +19,7 @@ spec:
     remediation:
       retries: 5
   upgrade:
+    cleanupOnFail: true
     disableWait: true
     remediation:
       retries: 5
@@ -39,8 +40,9 @@ spec:
     posthog:
       optOutCapture: true
       image:
-        repository: docker.io/posthog/posthog
-        tag: latest@sha256:9c93fc9fcb7211dfd5f56f8ebdd079f8a9ae7287c91fde7fc91baceecbc21223
+        repository: ghcr.io/blitss/posthog-web
+        tag: latest@sha256:c401ddbf32c27f6f8ec1344a9fac888c5d871506ee788a5f3718da784e44ca80
+        pullPolicy: Always
       env:
         # Allows creating multiple organizations in your instance (multi-tenancy). Requires a premium license.
         MULTI_ORG_ENABLED: "0"
@@ -51,8 +53,9 @@ spec:
     web:
       enabled: true
       image:
-        repository: docker.io/posthog/posthog
-        tag: latest@sha256:9c93fc9fcb7211dfd5f56f8ebdd079f8a9ae7287c91fde7fc91baceecbc21223
+        repository: ghcr.io/blitss/posthog-web
+        tag: latest@sha256:c401ddbf32c27f6f8ec1344a9fac888c5d871506ee788a5f3718da784e44ca80
+        pullPolicy: Always
       replicas: 1
       resources:
         requests:
@@ -91,6 +94,11 @@ spec:
     ## Kafka — Redpanda via operator (external)
     kafka:
       enabled: false
+    kafkaInit:
+      image:
+        repository: bitnamilegacy/kafka
+        tag: "3.7"
+        pullPolicy: IfNotPresent
     externalKafka:
       brokers: posthog-redpanda.posthog.svc.cluster.local:9093
 
@@ -245,6 +253,10 @@ spec:
       image:
         repository: ghcr.io/posthog/posthog/feature-flags
         tag: master@sha256:ed94fc16d394a28714f6bb17a944170c3a3a705c184a5e2f8949825f20ab25ee
+    hypercacheServer:
+      image:
+        repository: ghcr.io/posthog/posthog/hypercache-server
+        tag: master@sha256:022f4d8d40fab0f64c48c2fd8b5ed451aeb75f3be0528e93a2e5b852522909bd
     propertyDefsRs:
       image:
         repository: ghcr.io/posthog/posthog/property-defs-rs
@@ -262,19 +274,17 @@ spec:
       image:
         repository: ghcr.io/posthog/posthog/cyclotron-janitor
         tag: master@sha256:438239d1650fd7d28b937c301c181cfcd715abc17ac8a12a9718dd1111d5f803
-    ## Personhog services — disabled until we have a posthog_persons DB story.
-    ## Flip personhog.enabled (and the deployment toggles) once ready, then
-    ## bump rolloutPercentage gradually.
+    ## Personhog services — route all persons reads through the in-cluster router.
     personhog:
-      enabled: false
-      rolloutPercentage: 0
+      enabled: true
+      rolloutPercentage: 100
     personhogReplica:
-      enabled: false
+      enabled: true
       image:
         repository: ghcr.io/posthog/posthog/personhog-replica
         tag: master@sha256:fa7673f3c6115b78d97e6aaa8050e6362c7c6afca8d07cd05e83d888524e885d
     personhogRouter:
-      enabled: false
+      enabled: true
       image:
         repository: ghcr.io/posthog/posthog/personhog-router
         tag: master@sha256:c565cd4711407d20bce37ddf013018ff7cd80be862d85a506d40a4d6502e5bf5

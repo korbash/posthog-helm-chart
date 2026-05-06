@@ -57,28 +57,85 @@ spec:
         {{- include "posthog.geoipInitContainer" (dict "root" .) | nindent 8 }}
         {{- end }}
         ## Seed /docker-entrypoint.d into a writable emptyDir so the image's
-        ## bin/docker-server-unit can write unit.json there as the non-root
-        ## container user. Without this, the entrypoint fails with
-        ## "Permission denied" because /docker-entrypoint.d is image-baked
-        ## as root:root.
+        ## bin/docker-server-unit can read unit.json.tpl and write unit.json
+        ## there as the non-root container user. Some split production web
+        ## images include bin/docker-server-unit but not the Dockerfile's
+        ## /docker-entrypoint.d/unit.json.tpl, so the chart supplies the same
+        ## Unit template instead of copying from the image filesystem.
         ##
-        ## Also strip the "user": "nobody" line from unit.json.tpl so Unit
-        ## doesn't try to setuid (which fails without SETUID/SETGID caps in
-        ## the chart's default non-root containerSecurityContext). Workers
-        ## then run as the container's UID, which is fine for our purposes.
+        ## The "user": "nobody" entries are intentionally omitted so Unit
+        ## doesn't try to setuid, which fails without SETUID/SETGID caps in
+        ## the chart's default non-root containerSecurityContext.
         - name: seed-entrypoint-d
-          image: "{{ include "posthog.imageRef" (dict "root" . "component" "web" "fallbackComponent" "posthog") }}"
-          imagePullPolicy: {{ include "posthog.imagePullPolicy" (dict "root" . "component" "web" "fallbackComponent" "posthog") }}
+          image: busybox:1.37
+          imagePullPolicy: IfNotPresent
           {{- include "posthog.containerSecurityContext" (dict "root" . "component" "web") | nindent 10 }}
           command:
             - sh
-            - -c
+            - -ec
             - |
-              set -e
-              cp -r /docker-entrypoint.d/. /seed/
-              # Drop "user": "nobody" lines (with optional trailing comma)
-              # so Unit applications run as the container UID.
-              sed -i '/^[[:space:]]*"user":[[:space:]]*"nobody",\?[[:space:]]*$/d' /seed/unit.json.tpl
+              cat > /seed/unit.json.tpl <<'EOF'
+              {
+                  "settings": {
+                      "http": {
+                          "max_body_size": 22020096
+                      }
+                  },
+                  "listeners": {
+                      "*:8000": {
+                          "pass": "applications/posthog"
+                      },
+                      "*:8001": {
+                          "pass": "routes/metrics"
+                      },
+                      "*:8181": {
+                          "pass": "routes/status"
+                      }
+                  },
+                  "routes": {
+                      "metrics": [
+                          {
+                              "match": {
+                                  "uri": ["/metrics"]
+                              },
+                              "action": {
+                                  "pass": "applications/metrics"
+                              }
+                          }
+                      ],
+                      "status": [
+                          {
+                              "match": {
+                                  "uri": ["/status"]
+                              },
+                              "action": {
+                                  "proxy": "http://unix:/var/run/control.unit.sock"
+                              }
+                          }
+                      ]
+                  },
+                  "applications": {
+                      "posthog": {
+                          "type": "python 3.12",
+                          "processes": $NGINX_UNIT_APP_PROCESSES,
+                          "working_directory": "/code",
+                          "path": ".",
+                          "module": "posthog.$NGINX_UNIT_PYTHON_PROTOCOL",
+                          "protocol": "$NGINX_UNIT_PYTHON_PROTOCOL",
+                          "limits": {
+                              "requests": $NGINX_UNIT_REQUEST_LIMIT
+                          }
+                      },
+                      "metrics": {
+                          "type": "python 3.12",
+                          "processes": 1,
+                          "working_directory": "/code/bin",
+                          "path": ".",
+                          "module": "unit_metrics"
+                      }
+                  }
+              }
+              EOF
           volumeMounts:
             - name: entrypoint-d
               mountPath: /seed
@@ -107,7 +164,18 @@ spec:
           ## bin/docker-worker from spawning broken nodejs sidecars in the
           ## web pod.
           command:
-            - ./bin/docker-server
+            - sh
+            - -ec
+            - |
+              until ./bin/migrate-check; do
+                echo "Waiting for migrations to complete before starting web..."
+                sleep 10
+              done
+              if command -v unitd >/dev/null 2>&1; then
+                exec ./bin/docker-server
+              fi
+              echo "Nginx Unit is not available in this image; starting PostHog with uvicorn..."
+              exec python -m uvicorn posthog.asgi:application --host 0.0.0.0 --port 8000 --workers "${GRANIAN_WORKERS:-2}"
           {{- end }}
           ports:
             - containerPort: 8000
@@ -116,9 +184,15 @@ spec:
             {{- include "posthog.commonEnv" . | nindent 12 }}
             {{- include "posthog.personhogEnv" . | nindent 12 }}
             - name: USE_GRANIAN
-              value: {{ .Values.web.granian.enabled | default true | quote }}
+              value: {{ .Values.web.granian.enabled | quote }}
             - name: GRANIAN_WORKERS
               value: {{ .Values.web.granian.workers | default 2 | quote }}
+            - name: HOME
+              value: /tmp
+            - name: XDG_CACHE_HOME
+              value: /tmp/.cache
+            - name: MPLCONFIGDIR
+              value: /tmp/matplotlib
             {{- with .Values.web.extraEnv }}
             {{- toYaml . | nindent 12 }}
             {{- end }}
@@ -164,9 +238,10 @@ spec:
             httpGet:
               path: /preflight
               port: 8000
-            initialDelaySeconds: 10
-            periodSeconds: 10
-            failureThreshold: 30
+            initialDelaySeconds: {{ .Values.web.startupProbe.initialDelaySeconds }}
+            periodSeconds: {{ .Values.web.startupProbe.periodSeconds }}
+            timeoutSeconds: {{ .Values.web.startupProbe.timeoutSeconds }}
+            failureThreshold: {{ .Values.web.startupProbe.failureThreshold }}
         {{- with .Values.web.sidecarContainers }}
         {{- toYaml . | nindent 8 }}
         {{- end }}
@@ -228,10 +303,14 @@ spec:
           imagePullPolicy: {{ include "posthog.imagePullPolicy" (dict "root" . "component" "worker" "fallbackComponent" "posthog") }}
           {{- include "posthog.containerSecurityContext" (dict "root" . "component" "worker") | nindent 10 }}
           command:
-            - ./bin/docker-worker-celery
-            {{- if not .Values.workerBeat.enabled }}
-            - --with-scheduler
-            {{- end }}
+            - sh
+            - -ec
+            - |
+              until ./bin/migrate-check; do
+                echo "Waiting for migrations to complete before starting worker..."
+                sleep 10
+              done
+              exec ./bin/docker-worker-celery{{- if not .Values.workerBeat.enabled }} --with-scheduler{{- end }}
           env:
             {{- include "posthog.commonEnv" . | nindent 12 }}
             {{- include "posthog.personhogEnv" . | nindent 12 }}
@@ -258,6 +337,20 @@ spec:
             {{- end }}
           resources:
             {{- toYaml .Values.worker.resources | nindent 12 }}
+          {{- if .Values.worker.readinessProbe.enabled }}
+          readinessProbe:
+            exec:
+              command:
+                - python
+                - -c
+                - |
+                  from posthog.utils import get_celery_heartbeat
+                  raise SystemExit(0 if get_celery_heartbeat() != "offline" else 1)
+            initialDelaySeconds: {{ .Values.worker.readinessProbe.initialDelaySeconds }}
+            periodSeconds: {{ .Values.worker.readinessProbe.periodSeconds }}
+            timeoutSeconds: {{ .Values.worker.readinessProbe.timeoutSeconds }}
+            failureThreshold: {{ .Values.worker.readinessProbe.failureThreshold }}
+          {{- end }}
           {{- if or .Values.geoip.enabled .Values.worker.extraVolumeMounts }}
           volumeMounts:
             {{- if .Values.geoip.enabled }}
@@ -388,7 +481,14 @@ spec:
           imagePullPolicy: {{ include "posthog.imagePullPolicy" (dict "root" . "component" "workerExports" "fallbackComponent" "posthog") }}
           {{- include "posthog.containerSecurityContext" (dict "root" . "component" "workerExports") | nindent 10 }}
           command:
-            - ./bin/docker-worker-celery
+            - sh
+            - -ec
+            - |
+              until ./bin/migrate-check; do
+                echo "Waiting for migrations to complete before starting worker exports..."
+                sleep 10
+              done
+              exec ./bin/docker-worker-celery
           env:
             {{- include "posthog.commonEnv" . | nindent 12 }}
             - name: CELERY_WORKER_QUEUES

@@ -29,5 +29,8 @@ spec:
   upgrade:
     crds: CreateReplace
   values:
+    image:
+      repository: docker.redpanda.com/redpandadata/redpanda-operator
+      pullPolicy: IfNotPresent
     crds:
       enabled: true

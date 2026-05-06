@@ -282,7 +282,7 @@ clickhouse:
   enabled: true
   image:
     repository: ghcr.io/blitss/posthog-clickhouse
-    tag: 25.9.7
+    tag: 26.4
   database: posthog
   secure: false
   verify: false
@@ -535,6 +535,14 @@ rustfs:
   image:
     rustfs:
       tag: latest
+    initImage:
+      repository: busybox
+      tag: "1.37"
+      pullPolicy: IfNotPresent
+    clientImage:
+      repository: quay.io/minio/mc
+      tag: latest
+      pullPolicy: IfNotPresent
   replicaCount: 1
   mode:
     standalone:
@@ -696,6 +704,11 @@ web:
   granian:
     enabled: false
     workers: 2
+  startupProbe:
+    initialDelaySeconds: 10
+    periodSeconds: 10
+    timeoutSeconds: 5
+    failureThreshold: 120
   podSecurityContext: {}
   containerSecurityContext: {}
   nodeSelector: {}
@@ -734,6 +747,12 @@ worker:
       memory: 1Gi
     limits:
       memory: 2Gi
+  readinessProbe:
+    enabled: true
+    initialDelaySeconds: 10
+    periodSeconds: 10
+    timeoutSeconds: 20
+    failureThreshold: 6
   podSecurityContext: {}
   containerSecurityContext: {}
   nodeSelector: {}
@@ -972,6 +991,37 @@ featureFlags:
   podDisruptionBudget:
     enabled: false
     minAvailable: 1
+hypercacheServer:
+  enabled: true
+  image:
+    repository: ghcr.io/posthog/posthog/hypercache-server
+    tag: master
+    pullPolicy: Always
+  replicas: 1
+  port: 3002
+  rustLog: info
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      memory: 256Mi
+  podSecurityContext: {}
+  containerSecurityContext: {}
+  nodeSelector: {}
+  tolerations: []
+  affinity: {}
+  podAnnotations: {}
+  extraEnv: []
+  autoscaling:
+    enabled: false
+    minReplicas: 1
+    maxReplicas: 10
+    targetCPUUtilizationPercentage: 60
+    targetMemoryUtilizationPercentage: 70
+  podDisruptionBudget:
+    enabled: false
+    minAvailable: 1
 propertyDefsRs:
   enabled: true
   image:
@@ -1167,6 +1217,10 @@ kafkaInit:
   ## because the bitnami subchart handles provisioning via kafka.provisioning).
   ## Keep in sync with kafka.provisioning.topics above.
   enabled: true
+  image:
+    repository: bitnamilegacy/kafka
+    tag: "3.7"
+    pullPolicy: IfNotPresent
   topics:
     - cdp_backfill_events
     - cdp_batch_hogflow_requests

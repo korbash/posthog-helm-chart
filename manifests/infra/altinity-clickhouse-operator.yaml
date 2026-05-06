@@ -29,5 +29,15 @@ spec:
   upgrade:
     crds: CreateReplace
   values:
+    crdHook:
+      image:
+        repository: docker.io/bitnami/kubectl
+        tag: latest
+        pullPolicy: IfNotPresent
+    operator:
+      image:
+        registry: docker.io
+        repository: altinity/clickhouse-operator
+        pullPolicy: IfNotPresent
     metrics:
       enabled: false
