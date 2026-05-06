@@ -55,10 +55,7 @@ spec:
               "
               python manage.py migrate_clickhouse
               python manage.py sync_replicated_schema
-              # Mark noop async migrations as complete so health checks pass.
-              # Real (non-noop) async migrations are run through the UI per
-              # https://posthog.com/docs/runbook/async-migrations.
-              python manage.py run_async_migrations --complete-noop-migrations
+              python manage.py run_async_migrations
           env:
             {{- include "posthog.commonEnv" . | nindent 12 }}
 {{- end }}

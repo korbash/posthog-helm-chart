@@ -1,5 +1,5 @@
 {{/*
-  Hook weight 10: Run async migrations after all schema migrations are done.
+  Hook weight 10: Verify async migrations after all schema migrations are done.
 */}}
 {{- if .Values.asyncMigrationsCheck.enabled }}
 ---
@@ -29,6 +29,7 @@ spec:
             - python
             - manage.py
             - run_async_migrations
+            - --check
           env:
             {{- include "posthog.commonEnv" . | nindent 12 }}
 {{- end }}
