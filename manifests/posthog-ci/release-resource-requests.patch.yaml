@@ -40,6 +40,10 @@
     cpu: 10m
     memory: 96Mi
 - op: replace
+  path: /spec/values/workerBeat/resources/limits
+  value:
+    memory: 1536Mi
+- op: replace
   path: /spec/values/workerExports/resources/requests
   value:
     cpu: 25m
