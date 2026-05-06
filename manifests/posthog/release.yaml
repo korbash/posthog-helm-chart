@@ -59,10 +59,10 @@ spec:
       replicas: 1
       resources:
         requests:
-          cpu: 500m
-          memory: 2Gi
+          cpu: 100m
+          memory: 512Mi
         limits:
-          memory: 8Gi
+          memory: 2Gi
 
     ## PostgreSQL — CNPG (external)
     postgresql:
@@ -105,6 +105,15 @@ spec:
     ## Redis — bundled via chart. Elasticsearch is managed by ECK.
     redis:
       enabled: true
+      persistence:
+        enabled: false
+      maxmemory: 96mb
+      resources:
+        requests:
+          cpu: 25m
+          memory: 64Mi
+        limits:
+          memory: 128Mi
     elasticsearch:
       enabled: false
     externalElasticsearch:
@@ -120,6 +129,12 @@ spec:
       enabled: false
     rustfs:
       enabled: true
+      resources:
+        requests:
+          cpu: 50m
+          memory: 128Mi
+        limits:
+          memory: 512Mi
     seaweedfs:
       enabled: false
     objectStorage:
@@ -163,10 +178,10 @@ spec:
         targetMemoryUtilizationPercentage: 80
       resources:
         requests:
-          cpu: 500m
-          memory: 1Gi
+          cpu: 100m
+          memory: 512Mi
         limits:
-          memory: 8Gi
+          memory: 2Gi
     workerBeat:
       enabled: true
       image:
@@ -176,10 +191,10 @@ spec:
       replicas: 1
       resources:
         requests:
-          cpu: 100m
-          memory: 512Mi
+          cpu: 25m
+          memory: 128Mi
         limits:
-          memory: 6Gi
+          memory: 512Mi
     workerExports:
       enabled: true
       image:
@@ -197,10 +212,10 @@ spec:
         targetMemoryUtilizationPercentage: 80
       resources:
         requests:
-          cpu: 500m
-          memory: 2Gi
+          cpu: 100m
+          memory: 512Mi
         limits:
-          memory: 8Gi
+          memory: 2Gi
     temporalDjangoWorker:
       image:
         repository: ghcr.io/blitss/posthog-worker
@@ -215,10 +230,10 @@ spec:
         targetMemoryUtilizationPercentage: 80
       resources:
         requests:
-          cpu: 500m
-          memory: 1Gi
+          cpu: 100m
+          memory: 512Mi
         limits:
-          memory: 4Gi
+          memory: 2Gi
     migrate:
       image:
         repository: ghcr.io/blitss/posthog-migrate
@@ -233,47 +248,151 @@ spec:
       image:
         repository: docker.io/posthog/posthog-node
         tag: latest@sha256:863e76e040ad41aef79f605c33ec71f1529bddf94cfd88941c935da9bde97235
+      resources:
+        requests:
+          cpu: 100m
+          memory: 256Mi
+        limits:
+          memory: 1Gi
     capture:
       image:
         repository: ghcr.io/posthog/posthog/capture
         tag: master@sha256:51202b7475c86204905273a7fe7202da435c10a090064bb30ca5efe13a9e7eec
+      resources:
+        requests:
+          cpu: 50m
+          memory: 128Mi
+        limits:
+          memory: 512Mi
     replayCapture:
       image:
         repository: ghcr.io/posthog/posthog/capture
         tag: master@sha256:51202b7475c86204905273a7fe7202da435c10a090064bb30ca5efe13a9e7eec
+      resources:
+        requests:
+          cpu: 50m
+          memory: 128Mi
+        limits:
+          memory: 512Mi
     captureAi:
       image:
         repository: ghcr.io/posthog/posthog/capture
         tag: master@sha256:51202b7475c86204905273a7fe7202da435c10a090064bb30ca5efe13a9e7eec
+      resources:
+        requests:
+          cpu: 50m
+          memory: 128Mi
+        limits:
+          memory: 512Mi
     captureLogs:
       image:
         repository: ghcr.io/posthog/posthog/capture-logs
         tag: master@sha256:21091237f6a74ef0049d6cc23b0631de31c22187426eb9f638f32b885663cbfb
+      resources:
+        requests:
+          cpu: 25m
+          memory: 64Mi
+        limits:
+          memory: 256Mi
     featureFlags:
       image:
         repository: ghcr.io/posthog/posthog/feature-flags
         tag: master@sha256:ed94fc16d394a28714f6bb17a944170c3a3a705c184a5e2f8949825f20ab25ee
+      resources:
+        requests:
+          cpu: 50m
+          memory: 64Mi
+        limits:
+          memory: 256Mi
     hypercacheServer:
       image:
         repository: ghcr.io/posthog/posthog/hypercache-server
         tag: master@sha256:022f4d8d40fab0f64c48c2fd8b5ed451aeb75f3be0528e93a2e5b852522909bd
+      resources:
+        requests:
+          cpu: 50m
+          memory: 64Mi
+        limits:
+          memory: 256Mi
     propertyDefsRs:
       image:
         repository: ghcr.io/posthog/posthog/property-defs-rs
         tag: master@sha256:a87bfb72bd26540ce04919101864dc2dd77455454dcd4bd04749f0d46178e5cf
+      resources:
+        requests:
+          cpu: 50m
+          memory: 64Mi
+        limits:
+          memory: 256Mi
     livestream:
       enabled: true
       image:
         repository: ghcr.io/posthog/posthog/livestream
         tag: master@sha256:211f1d57e9f19729318ab306b90fe75d18a143d93230e8c68293a5f1c34867f4
+      resources:
+        requests:
+          cpu: 25m
+          memory: 64Mi
+        limits:
+          memory: 256Mi
     cymbal:
       image:
         repository: ghcr.io/posthog/posthog/cymbal
         tag: master@sha256:7f62ca286963d8c13aa716d0936c192c31e104b72205699c64109e29b4915ce2
+      resources:
+        requests:
+          cpu: 50m
+          memory: 128Mi
+        limits:
+          memory: 512Mi
     cyclotronJanitor:
       image:
         repository: ghcr.io/posthog/posthog/cyclotron-janitor
         tag: master@sha256:438239d1650fd7d28b937c301c181cfcd715abc17ac8a12a9718dd1111d5f803
+    ## Keep this manifest schedulable on a single-node kind cluster while
+    ## still deploying the full happy-path service graph.
+    ingestionGeneral:
+      resources:
+        requests:
+          cpu: 100m
+          memory: 256Mi
+        limits:
+          memory: 1Gi
+    ingestionSessionReplay:
+      resources:
+        requests:
+          cpu: 50m
+          memory: 128Mi
+        limits:
+          memory: 512Mi
+    recordingApi:
+      resources:
+        requests:
+          cpu: 50m
+          memory: 128Mi
+        limits:
+          memory: 512Mi
+    ingestionErrorTracking:
+      resources:
+        requests:
+          cpu: 50m
+          memory: 128Mi
+        limits:
+          memory: 512Mi
+    ingestionLogs:
+      resources:
+        requests:
+          cpu: 50m
+          memory: 128Mi
+        limits:
+          memory: 512Mi
+    ingestionTraces:
+      resources:
+        requests:
+          cpu: 50m
+          memory: 128Mi
+        limits:
+          memory: 512Mi
     ## Personhog services — route all persons reads through the in-cluster router.
     personhog:
       enabled: true
@@ -283,11 +402,23 @@ spec:
       image:
         repository: ghcr.io/posthog/posthog/personhog-replica
         tag: master@sha256:fa7673f3c6115b78d97e6aaa8050e6362c7c6afca8d07cd05e83d888524e885d
+      resources:
+        requests:
+          cpu: 50m
+          memory: 64Mi
+        limits:
+          memory: 256Mi
     personhogRouter:
       enabled: true
       image:
         repository: ghcr.io/posthog/posthog/personhog-router
         tag: master@sha256:c565cd4711407d20bce37ddf013018ff7cd80be862d85a506d40a4d6502e5bf5
+      resources:
+        requests:
+          cpu: 25m
+          memory: 64Mi
+        limits:
+          memory: 256Mi
     global:
       containerSecurityContext: {}
       podSecurityContext: {}

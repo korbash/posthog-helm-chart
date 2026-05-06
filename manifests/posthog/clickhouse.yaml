@@ -240,11 +240,11 @@ spec:
                   mountPath: /docker-entrypoint-initdb.d
               resources:
                 requests:
+                  cpu: 500m
+                  memory: 2Gi
+                limits:
                   cpu: "1"
                   memory: 4Gi
-                limits:
-                  cpu: "2"
-                  memory: 8Gi
           volumes:
             - name: initdb
               configMap:
