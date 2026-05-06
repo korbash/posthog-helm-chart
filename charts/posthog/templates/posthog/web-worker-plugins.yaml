@@ -52,10 +52,26 @@ spec:
       {{- include "posthog.affinity" (dict "root" . "component" "web") | nindent 6 }}
       {{- include "posthog.topologySpreadConstraints" (dict "root" . "component" "web") | nindent 6 }}
       terminationGracePeriodSeconds: 120
-      {{- if .Values.geoip.enabled }}
       initContainers:
+        {{- if .Values.geoip.enabled }}
         {{- include "posthog.geoipInitContainer" (dict "root" .) | nindent 8 }}
-      {{- end }}
+        {{- end }}
+        ## Seed /docker-entrypoint.d into a writable emptyDir so the image's
+        ## bin/docker-server-unit can write unit.json there as the non-root
+        ## container user. Without this, the entrypoint fails with
+        ## "Permission denied" because /docker-entrypoint.d is image-baked
+        ## as root:root.
+        - name: seed-entrypoint-d
+          image: "{{ include "posthog.imageRef" (dict "root" . "component" "web" "fallbackComponent" "posthog") }}"
+          imagePullPolicy: {{ include "posthog.imagePullPolicy" (dict "root" . "component" "web" "fallbackComponent" "posthog") }}
+          {{- include "posthog.containerSecurityContext" (dict "root" . "component" "web") | nindent 10 }}
+          command:
+            - sh
+            - -c
+            - cp -r /docker-entrypoint.d/. /seed/
+          volumeMounts:
+            - name: entrypoint-d
+              mountPath: /seed
       containers:
         - name: web
           image: "{{ include "posthog.imageRef" (dict "root" . "component" "web" "fallbackComponent" "posthog") }}"
@@ -89,15 +105,21 @@ spec:
             {{- end }}
           resources:
             {{- toYaml .Values.web.resources | nindent 12 }}
-          {{- if or .Values.geoip.enabled .Values.web.extraVolumeMounts }}
           volumeMounts:
             {{- if .Values.geoip.enabled }}
             {{- include "posthog.geoipVolumeMount" (dict "root" . "mountPath" "/code/share") | nindent 12 }}
             {{- end }}
+            ## Writable /var/run for Nginx Unit's control socket (non-root
+            ## container can't write to the image's root-owned /var/run).
+            - name: var-run
+              mountPath: /var/run
+            ## Writable /docker-entrypoint.d (seeded by init container above)
+            ## so bin/docker-server-unit can write unit.json there.
+            - name: entrypoint-d
+              mountPath: /docker-entrypoint.d
             {{- with .Values.web.extraVolumeMounts }}
             {{- toYaml . | nindent 12 }}
             {{- end }}
-          {{- end }}
           readinessProbe:
             httpGet:
               path: /preflight
@@ -124,15 +146,17 @@ spec:
         {{- with .Values.web.sidecarContainers }}
         {{- toYaml . | nindent 8 }}
         {{- end }}
-      {{- if or .Values.geoip.enabled .Values.web.extraVolumes }}
       volumes:
         {{- if .Values.geoip.enabled }}
         {{- include "posthog.geoipVolume" (dict "root" .) | nindent 8 }}
         {{- end }}
+        - name: var-run
+          emptyDir: {}
+        - name: entrypoint-d
+          emptyDir: {}
         {{- with .Values.web.extraVolumes }}
         {{- toYaml . | nindent 8 }}
         {{- end }}
-      {{- end }}
 {{- end }}
 
 {{- if .Values.worker.enabled }}

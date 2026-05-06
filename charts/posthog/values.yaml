@@ -689,8 +689,12 @@ web:
       memory: 1Gi
     limits:
       memory: 2Gi
+  ## Granian was removed from the production posthog/posthog image in
+  ## PostHog#54394 (2026-04). When enabled, the chart sets `command:
+  ## granian ...` directly, which fails on current images. Default off
+  ## so the image's built-in Nginx Unit entrypoint runs instead.
   granian:
-    enabled: true
+    enabled: false
     workers: 2
   podSecurityContext: {}
   containerSecurityContext: {}
