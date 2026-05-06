@@ -61,6 +61,11 @@ spec:
         ## container user. Without this, the entrypoint fails with
         ## "Permission denied" because /docker-entrypoint.d is image-baked
         ## as root:root.
+        ##
+        ## Also strip the "user": "nobody" line from unit.json.tpl so Unit
+        ## doesn't try to setuid (which fails without SETUID/SETGID caps in
+        ## the chart's default non-root containerSecurityContext). Workers
+        ## then run as the container's UID, which is fine for our purposes.
         - name: seed-entrypoint-d
           image: "{{ include "posthog.imageRef" (dict "root" . "component" "web" "fallbackComponent" "posthog") }}"
           imagePullPolicy: {{ include "posthog.imagePullPolicy" (dict "root" . "component" "web" "fallbackComponent" "posthog") }}
@@ -68,7 +73,12 @@ spec:
           command:
             - sh
             - -c
-            - cp -r /docker-entrypoint.d/. /seed/
+            - |
+              set -e
+              cp -r /docker-entrypoint.d/. /seed/
+              # Drop "user": "nobody" lines (with optional trailing comma)
+              # so Unit applications run as the container UID.
+              sed -i '/^[[:space:]]*"user":[[:space:]]*"nobody",\?[[:space:]]*$/d' /seed/unit.json.tpl
           volumeMounts:
             - name: entrypoint-d
               mountPath: /seed
