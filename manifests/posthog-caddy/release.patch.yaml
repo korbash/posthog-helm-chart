@@ -21,10 +21,11 @@
     TRUSTED_PROXIES: "10.0.0.0/8,172.16.0.0/12,192.168.0.0/16,127.0.0.1/32"
     MULTI_ORG_ENABLED: "0"
 - op: add
-  path: /spec/values/global/extraEnv/-
+  path: /spec/values/global
   value:
-    name: TRUSTED_PROXIES
-    value: "10.0.0.0/8,172.16.0.0/12,192.168.0.0/16,127.0.0.1/32"
+    extraEnv:
+      - name: TRUSTED_PROXIES
+        value: "10.0.0.0/8,172.16.0.0/12,192.168.0.0/16,127.0.0.1/32"
 - op: replace
   path: /spec/values/redis/persistence/enabled
   value: true
