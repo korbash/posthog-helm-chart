@@ -35,3 +35,11 @@
     name: local-path
     dataStorageSize: 30Gi
     logStorageSize: 256Mi
+- op: replace
+  path: /spec/values/workerBeat/resources
+  value:
+    requests:
+      cpu: 50m
+      memory: 512Mi
+    limits:
+      memory: 2Gi
