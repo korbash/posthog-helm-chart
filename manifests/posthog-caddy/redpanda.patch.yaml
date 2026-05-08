@@ -1,0 +1,6 @@
+- op: add
+  path: /spec/clusterSpec/storage/persistentVolume/storageClass
+  value: local-path
+- op: replace
+  path: /spec/clusterSpec/storage/persistentVolume/size
+  value: 20Gi

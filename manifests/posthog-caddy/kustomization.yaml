@@ -1,0 +1,49 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - ../posthog
+
+patches:
+  - path: release.patch.yaml
+    target:
+      group: helm.toolkit.fluxcd.io
+      version: v2
+      kind: HelmRelease
+      name: posthog
+      namespace: posthog
+  - path: postgres.patch.yaml
+    target:
+      group: postgresql.cnpg.io
+      version: v1
+      kind: Cluster
+      name: posthog-pg
+      namespace: posthog
+  - path: clickhouse.patch.yaml
+    target:
+      group: clickhouse.altinity.com
+      version: v1
+      kind: ClickHouseInstallation
+      name: posthog
+      namespace: posthog
+  - path: keeper.patch.yaml
+    target:
+      group: clickhouse-keeper.altinity.com
+      version: v1
+      kind: ClickHouseKeeperInstallation
+      name: posthog-keeper
+      namespace: posthog
+  - path: redpanda.patch.yaml
+    target:
+      group: cluster.redpanda.com
+      version: v1alpha2
+      kind: Redpanda
+      name: posthog-redpanda
+      namespace: posthog
+  - path: elasticsearch.patch.yaml
+    target:
+      group: elasticsearch.k8s.elastic.co
+      version: v1
+      kind: Elasticsearch
+      name: posthog-elastic
+      namespace: posthog

@@ -1,0 +1,6 @@
+- op: add
+  path: /spec/storage/storageClass
+  value: local-path
+- op: replace
+  path: /spec/storage/size
+  value: 20Gi
