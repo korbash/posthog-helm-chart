@@ -18,6 +18,7 @@
     OBJECT_STORAGE_PUBLIC_ENDPOINT: https://k8s-posthog.spposthog.gg
     SECURE_COOKIES: "true"
     DISABLE_SECURE_SSL_REDIRECT: "false"
+    TRUSTED_PROXIES: "10.0.0.0/8,172.16.0.0/12,192.168.0.0/16,127.0.0.1/32"
     MULTI_ORG_ENABLED: "0"
 - op: replace
   path: /spec/values/redis/persistence/enabled
