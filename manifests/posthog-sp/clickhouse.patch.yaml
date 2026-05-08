@@ -1,0 +1,6 @@
+- op: add
+  path: /spec/templates/volumeClaimTemplates/0/spec/storageClassName
+  value: local-path
+- op: replace
+  path: /spec/templates/volumeClaimTemplates/0/spec/resources/requests/storage
+  value: 80Gi

@@ -1,0 +1,41 @@
+- op: replace
+  path: /spec/values/ingress/hostname
+  value: posthog.94.103.93.202.nip.io
+- op: replace
+  path: /spec/values/ingress/gateway/enabled
+  value: false
+- op: replace
+  path: /spec/values/ingress/traefik/enabled
+  value: true
+- op: replace
+  path: /spec/values/ingress/traefik/entryPoints
+  value:
+    - websecure
+- op: add
+  path: /spec/values/ingress/traefik/tls
+  value:
+    enabled: true
+    secretName: posthog-tls
+- op: replace
+  path: /spec/values/posthog/env
+  value:
+    SITE_URL: https://posthog.94.103.93.202.nip.io
+    OBJECT_STORAGE_PUBLIC_ENDPOINT: https://posthog.94.103.93.202.nip.io
+    SECURE_COOKIES: "true"
+    DISABLE_SECURE_SSL_REDIRECT: "false"
+    MULTI_ORG_ENABLED: "0"
+- op: replace
+  path: /spec/values/redis/persistence/enabled
+  value: true
+- op: add
+  path: /spec/values/redis/persistence/storageClass
+  value: local-path
+- op: add
+  path: /spec/values/redis/persistence/size
+  value: 5Gi
+- op: add
+  path: /spec/values/rustfs/storageclass
+  value:
+    name: local-path
+    dataStorageSize: 30Gi
+    logStorageSize: 256Mi
