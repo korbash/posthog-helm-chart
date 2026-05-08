@@ -11,6 +11,10 @@
   path: /spec/values/ingress/traefik/entryPoints
   value:
     - web
+- op: add
+  path: /spec/values/ingress/traefik/tls
+  value:
+    enabled: false
 - op: replace
   path: /spec/values/posthog/env
   value:
