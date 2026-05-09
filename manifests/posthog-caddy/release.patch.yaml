@@ -1,6 +1,6 @@
 - op: replace
   path: /spec/values/ingress/hostname
-  value: k8s-posthog.spposthog.gg
+  value: k8s-posthog.37.27.124.54.nip.io
 - op: replace
   path: /spec/values/ingress/gateway/enabled
   value: false
@@ -18,8 +18,8 @@
 - op: replace
   path: /spec/values/posthog/env
   value:
-    SITE_URL: https://k8s-posthog.spposthog.gg
-    OBJECT_STORAGE_PUBLIC_ENDPOINT: https://k8s-posthog.spposthog.gg
+    SITE_URL: https://k8s-posthog.37.27.124.54.nip.io
+    OBJECT_STORAGE_PUBLIC_ENDPOINT: https://k8s-posthog.37.27.124.54.nip.io
     SECURE_COOKIES: "true"
     DISABLE_SECURE_SSL_REDIRECT: "true"
     TRUSTED_PROXIES: "10.0.0.0/8,172.16.0.0/12,192.168.0.0/16,127.0.0.1/32"
