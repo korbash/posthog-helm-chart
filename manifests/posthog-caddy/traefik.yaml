@@ -47,6 +47,15 @@ spec:
           default: true
         exposedPort: 443
         port: 443
+      # Avoid conflicts with node-exporter (9100) and other host services (8080)
+      metrics:
+        port: 19100
+        expose:
+          default: false
+      traefik:
+        port: 19080
+        expose:
+          default: false
     providers:
       kubernetesCRD:
         enabled: true
