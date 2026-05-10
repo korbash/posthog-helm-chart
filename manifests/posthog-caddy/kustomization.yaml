@@ -3,6 +3,10 @@ kind: Kustomization
 
 resources:
   - ../posthog
+  - traefik.yaml
+  - legacy-caddy.yaml
+  - letsencrypt-issuer.yaml
+  - posthog-certificate.yaml
 
 patches:
   - path: release.patch.yaml

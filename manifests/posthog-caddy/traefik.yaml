@@ -1,0 +1,73 @@
+apiVersion: source.toolkit.fluxcd.io/v1
+kind: HelmRepository
+metadata:
+  name: traefik
+  namespace: traefik
+spec:
+  interval: 24h
+  url: https://traefik.github.io/charts
+---
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: traefik
+  namespace: traefik
+spec:
+  interval: 30m
+  chart:
+    spec:
+      chart: traefik
+      version: "40.0.0"
+      sourceRef:
+        kind: HelmRepository
+        name: traefik
+        namespace: traefik
+  values:
+    deployment:
+      replicas: 1
+      # Required for DNS resolution when using hostNetwork
+      dnsPolicy: ClusterFirstWithHostNet
+    # Bind directly on host network so Traefik owns ports 80/443 without NodePort
+    hostNetwork: true
+    ingressClass:
+      enabled: true
+      isDefaultClass: false
+      name: traefik
+    service:
+      spec:
+        type: ClusterIP
+    ports:
+      web:
+        expose:
+          default: true
+        exposedPort: 80
+        port: 80
+      websecure:
+        expose:
+          default: true
+        exposedPort: 443
+        port: 443
+    providers:
+      kubernetesCRD:
+        enabled: true
+        allowEmptyServices: true
+      kubernetesIngress:
+        enabled: true
+        allowEmptyServices: true
+        publishedService:
+          enabled: true
+    securityContext:
+      allowPrivilegeEscalation: false
+      capabilities:
+        # Required to bind privileged ports (<1024) as non-root
+        add:
+          - NET_BIND_SERVICE
+        drop:
+          - ALL
+      readOnlyRootFilesystem: true
+    podSecurityContext:
+      runAsGroup: 65532
+      runAsNonRoot: true
+      runAsUser: 65532
+      seccompProfile:
+        type: RuntimeDefault

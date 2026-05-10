@@ -10,18 +10,19 @@
 - op: replace
   path: /spec/values/ingress/traefik/entryPoints
   value:
-    - web
+    - websecure
 - op: add
   path: /spec/values/ingress/traefik/tls
   value:
-    enabled: false
+    enabled: true
+    secretName: posthog-tls
 - op: replace
   path: /spec/values/posthog/env
   value:
     SITE_URL: https://k8s-posthog.37.27.124.54.nip.io
     OBJECT_STORAGE_PUBLIC_ENDPOINT: https://k8s-posthog.37.27.124.54.nip.io
     SECURE_COOKIES: "true"
-    DISABLE_SECURE_SSL_REDIRECT: "true"
+    DISABLE_SECURE_SSL_REDIRECT: "false"
     TRUSTED_PROXIES: "10.0.0.0/8,172.16.0.0/12,192.168.0.0/16,127.0.0.1/32"
     MULTI_ORG_ENABLED: "0"
 - op: replace

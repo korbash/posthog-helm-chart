@@ -1,0 +1,85 @@
+# Services and routing for the Docker Compose Caddy backend (legacy spposthog.gg).
+#
+# With Traefik running hostNetwork, 127.0.0.1 inside the Traefik pod IS the
+# host loopback, so the Endpoints below reach Docker Caddy on its internal ports.
+#
+# HTTP flow:  spposthog.gg:80  -> Traefik (web) -> IngressRoute -> legacy-caddy-http -> Caddy :18080
+# HTTPS flow: spposthog.gg:443 -> Traefik (websecure) TCP SNI passthrough -> legacy-caddy-https -> Caddy :18443
+# Caddy continues to own the TLS cert for spposthog.gg and handles ACME renewal.
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: legacy-caddy-http
+  namespace: traefik
+spec:
+  ports:
+    - port: 80
+      targetPort: 18080
+      protocol: TCP
+---
+apiVersion: v1
+kind: Endpoints
+metadata:
+  name: legacy-caddy-http
+  namespace: traefik
+subsets:
+  - addresses:
+      - ip: 127.0.0.1
+    ports:
+      - port: 18080
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: legacy-caddy-https
+  namespace: traefik
+spec:
+  ports:
+    - port: 443
+      targetPort: 18443
+      protocol: TCP
+---
+apiVersion: v1
+kind: Endpoints
+metadata:
+  name: legacy-caddy-https
+  namespace: traefik
+subsets:
+  - addresses:
+      - ip: 127.0.0.1
+    ports:
+      - port: 18443
+---
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: spposthog-http
+  namespace: traefik
+spec:
+  entryPoints:
+    - web
+  routes:
+    - kind: Rule
+      match: Host(`spposthog.gg`)
+      services:
+        - name: legacy-caddy-http
+          port: 80
+---
+# TCP passthrough: Traefik forwards raw TLS bytes to Caddy.
+# Caddy terminates TLS and holds the spposthog.gg certificate.
+apiVersion: traefik.io/v1alpha1
+kind: IngressRouteTCP
+metadata:
+  name: spposthog-https
+  namespace: traefik
+spec:
+  entryPoints:
+    - websecure
+  routes:
+    - match: HostSNI(`spposthog.gg`)
+      services:
+        - name: legacy-caddy-https
+          port: 443
+  tls:
+    passthrough: true

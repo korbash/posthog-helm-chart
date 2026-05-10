@@ -1,0 +1,12 @@
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: posthog-tls
+  namespace: posthog
+spec:
+  secretName: posthog-tls
+  issuerRef:
+    name: letsencrypt-http01
+    kind: ClusterIssuer
+  dnsNames:
+    - k8s-posthog.37.27.124.54.nip.io
