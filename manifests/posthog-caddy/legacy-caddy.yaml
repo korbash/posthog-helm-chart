@@ -25,7 +25,7 @@ metadata:
   namespace: traefik
 subsets:
   - addresses:
-      - ip: 127.0.0.1
+      - ip: 172.18.0.1
     ports:
       - port: 18080
 ---
@@ -47,7 +47,7 @@ metadata:
   namespace: traefik
 subsets:
   - addresses:
-      - ip: 127.0.0.1
+      - ip: 172.18.0.1
     ports:
       - port: 18443
 ---
