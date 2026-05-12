@@ -69,7 +69,7 @@ spec:
       metrics:
         port: 19100
         expose:
-          default: false
+          default: true
       traefik:
         port: 19080
         expose:

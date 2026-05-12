@@ -9,6 +9,7 @@ resources:
   - posthog-certificate.yaml
   - db-certificates.yaml
   - db-routing.yaml
+  - monitoring.yaml
 
 patches:
   - path: release.patch.yaml

@@ -21,6 +21,19 @@
       </openSSL>
     </clickhouse>
 - op: add
+  path: /spec/configuration/files/config.d~1prometheus.xml
+  value: |
+    <clickhouse>
+      <prometheus>
+        <endpoint>/metrics</endpoint>
+        <port>9363</port>
+        <metrics>true</metrics>
+        <events>true</events>
+        <asynchronous_metrics>true</asynchronous_metrics>
+        <errors>true</errors>
+      </prometheus>
+    </clickhouse>
+- op: add
   path: /spec/templates/podTemplates/0/spec/containers/0/volumeMounts/-
   value:
     name: clickhouse-tls
