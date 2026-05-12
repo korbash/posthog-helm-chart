@@ -99,6 +99,7 @@ spec:
 
     prometheus-node-exporter:
       enabled: true
+      hostNetwork: false
 ---
 apiVersion: cert-manager.io/v1
 kind: Certificate
