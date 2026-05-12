@@ -1,0 +1,321 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-dashboard-traefik
+  namespace: monitoring
+  labels:
+    grafana_dashboard: "1"
+data:
+  traefik-overview.json: |
+    {
+      "uid": "posthog-traefik-overview",
+      "title": "Traefik / Overview",
+      "tags": ["posthog", "traefik"],
+      "timezone": "browser",
+      "schemaVersion": 41,
+      "version": 1,
+      "refresh": "30s",
+      "time": { "from": "now-6h", "to": "now" },
+      "templating": {
+        "list": [
+          { "name": "datasource", "type": "datasource", "query": "prometheus", "current": { "text": "Prometheus", "value": "prometheus" } }
+        ]
+      },
+      "panels": [
+        {
+          "id": 1,
+          "type": "stat",
+          "title": "Requests / sec",
+          "datasource": { "uid": "$datasource" },
+          "gridPos": { "h": 4, "w": 6, "x": 0, "y": 0 },
+          "fieldConfig": { "defaults": { "unit": "reqps", "thresholds": { "mode": "absolute", "steps": [{ "color": "green" }] } }, "overrides": [] },
+          "options": { "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "orientation": "auto", "textMode": "auto", "colorMode": "value", "graphMode": "area", "justifyMode": "auto" },
+          "targets": [{ "refId": "A", "expr": "sum(rate(traefik_entrypoint_requests_total[$__rate_interval]))", "legendFormat": "rps" }]
+        },
+        {
+          "id": 2,
+          "type": "stat",
+          "title": "5xx / sec",
+          "datasource": { "uid": "$datasource" },
+          "gridPos": { "h": 4, "w": 6, "x": 6, "y": 0 },
+          "fieldConfig": { "defaults": { "unit": "reqps", "thresholds": { "mode": "absolute", "steps": [{ "color": "green" }, { "color": "red", "value": 0.1 }] } }, "overrides": [] },
+          "options": { "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "orientation": "auto", "textMode": "auto", "colorMode": "value", "graphMode": "area", "justifyMode": "auto" },
+          "targets": [{ "refId": "A", "expr": "sum(rate(traefik_entrypoint_requests_total{code=~\"5..\"}[$__rate_interval]))", "legendFormat": "5xx" }]
+        },
+        {
+          "id": 3,
+          "type": "stat",
+          "title": "Open connections",
+          "datasource": { "uid": "$datasource" },
+          "gridPos": { "h": 4, "w": 6, "x": 12, "y": 0 },
+          "fieldConfig": { "defaults": { "unit": "short", "thresholds": { "mode": "absolute", "steps": [{ "color": "green" }] } }, "overrides": [] },
+          "options": { "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "orientation": "auto", "textMode": "auto", "colorMode": "value", "graphMode": "area", "justifyMode": "auto" },
+          "targets": [{ "refId": "A", "expr": "sum(traefik_open_connections)", "legendFormat": "connections" }]
+        },
+        {
+          "id": 4,
+          "type": "stat",
+          "title": "Config reloads failed",
+          "datasource": { "uid": "$datasource" },
+          "gridPos": { "h": 4, "w": 6, "x": 18, "y": 0 },
+          "fieldConfig": { "defaults": { "unit": "short", "thresholds": { "mode": "absolute", "steps": [{ "color": "green" }, { "color": "red", "value": 1 }] } }, "overrides": [] },
+          "options": { "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "orientation": "auto", "textMode": "auto", "colorMode": "value", "graphMode": "area", "justifyMode": "auto" },
+          "targets": [{ "refId": "A", "expr": "sum(traefik_config_last_reload_success == 0)", "legendFormat": "failed" }]
+        },
+        {
+          "id": 5,
+          "type": "timeseries",
+          "title": "Requests by entrypoint/code",
+          "datasource": { "uid": "$datasource" },
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 4 },
+          "fieldConfig": { "defaults": { "unit": "reqps", "custom": { "drawStyle": "line", "lineWidth": 1, "fillOpacity": 10, "showPoints": "never" } }, "overrides": [] },
+          "options": { "legend": { "displayMode": "list", "placement": "bottom", "showLegend": true }, "tooltip": { "mode": "multi", "sort": "desc" } },
+          "targets": [{ "refId": "A", "expr": "sum by (entrypoint, code) (rate(traefik_entrypoint_requests_total[$__rate_interval]))", "legendFormat": "{{entrypoint}} {{code}}" }]
+        },
+        {
+          "id": 6,
+          "type": "timeseries",
+          "title": "Service latency p95",
+          "datasource": { "uid": "$datasource" },
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 4 },
+          "fieldConfig": { "defaults": { "unit": "s", "custom": { "drawStyle": "line", "lineWidth": 1, "fillOpacity": 10, "showPoints": "never" } }, "overrides": [] },
+          "options": { "legend": { "displayMode": "list", "placement": "bottom", "showLegend": true }, "tooltip": { "mode": "multi", "sort": "desc" } },
+          "targets": [{ "refId": "A", "expr": "histogram_quantile(0.95, sum by (le, service) (rate(traefik_service_request_duration_seconds_bucket[$__rate_interval])))", "legendFormat": "{{service}}" }]
+        }
+      ]
+    }
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-dashboard-redpanda
+  namespace: monitoring
+  labels:
+    grafana_dashboard: "1"
+data:
+  redpanda-overview.json: |
+    {
+      "uid": "posthog-redpanda-overview",
+      "title": "Redpanda / Overview",
+      "tags": ["posthog", "redpanda", "kafka"],
+      "timezone": "browser",
+      "schemaVersion": 41,
+      "version": 1,
+      "refresh": "30s",
+      "time": { "from": "now-6h", "to": "now" },
+      "templating": {
+        "list": [
+          { "name": "datasource", "type": "datasource", "query": "prometheus", "current": { "text": "Prometheus", "value": "prometheus" } }
+        ]
+      },
+      "panels": [
+        {
+          "id": 1,
+          "type": "stat",
+          "title": "Brokers",
+          "datasource": { "uid": "$datasource" },
+          "gridPos": { "h": 4, "w": 6, "x": 0, "y": 0 },
+          "fieldConfig": { "defaults": { "unit": "short", "thresholds": { "mode": "absolute", "steps": [{ "color": "red" }, { "color": "green", "value": 1 }] } }, "overrides": [] },
+          "options": { "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "orientation": "auto", "textMode": "auto", "colorMode": "value", "graphMode": "area", "justifyMode": "auto" },
+          "targets": [{ "refId": "A", "expr": "max(redpanda_cluster_brokers)", "legendFormat": "brokers" }]
+        },
+        {
+          "id": 2,
+          "type": "stat",
+          "title": "Unavailable partitions",
+          "datasource": { "uid": "$datasource" },
+          "gridPos": { "h": 4, "w": 6, "x": 6, "y": 0 },
+          "fieldConfig": { "defaults": { "unit": "short", "thresholds": { "mode": "absolute", "steps": [{ "color": "green" }, { "color": "red", "value": 1 }] } }, "overrides": [] },
+          "options": { "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "orientation": "auto", "textMode": "auto", "colorMode": "value", "graphMode": "area", "justifyMode": "auto" },
+          "targets": [{ "refId": "A", "expr": "sum(redpanda_cluster_unavailable_partitions)", "legendFormat": "unavailable" }]
+        },
+        {
+          "id": 3,
+          "type": "stat",
+          "title": "Under-replicated replicas",
+          "datasource": { "uid": "$datasource" },
+          "gridPos": { "h": 4, "w": 6, "x": 12, "y": 0 },
+          "fieldConfig": { "defaults": { "unit": "short", "thresholds": { "mode": "absolute", "steps": [{ "color": "green" }, { "color": "red", "value": 1 }] } }, "overrides": [] },
+          "options": { "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "orientation": "auto", "textMode": "auto", "colorMode": "value", "graphMode": "area", "justifyMode": "auto" },
+          "targets": [{ "refId": "A", "expr": "sum(redpanda_kafka_under_replicated_replicas)", "legendFormat": "under-replicated" }]
+        },
+        {
+          "id": 4,
+          "type": "stat",
+          "title": "Disk free",
+          "datasource": { "uid": "$datasource" },
+          "gridPos": { "h": 4, "w": 6, "x": 18, "y": 0 },
+          "fieldConfig": { "defaults": { "unit": "percentunit", "thresholds": { "mode": "absolute", "steps": [{ "color": "red" }, { "color": "orange", "value": 0.15 }, { "color": "green", "value": 0.25 }] } }, "overrides": [] },
+          "options": { "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "orientation": "auto", "textMode": "auto", "colorMode": "value", "graphMode": "area", "justifyMode": "auto" },
+          "targets": [{ "refId": "A", "expr": "min(redpanda_storage_disk_free_bytes / redpanda_storage_disk_total_bytes)", "legendFormat": "free" }]
+        },
+        {
+          "id": 5,
+          "type": "timeseries",
+          "title": "Kafka records produced/fetched",
+          "datasource": { "uid": "$datasource" },
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 4 },
+          "fieldConfig": { "defaults": { "unit": "ops", "custom": { "drawStyle": "line", "lineWidth": 1, "fillOpacity": 10, "showPoints": "never" } }, "overrides": [] },
+          "options": { "legend": { "displayMode": "list", "placement": "bottom", "showLegend": true }, "tooltip": { "mode": "multi", "sort": "desc" } },
+          "targets": [
+            { "refId": "A", "expr": "sum(rate(redpanda_kafka_records_produced_total[$__rate_interval]))", "legendFormat": "produced" },
+            { "refId": "B", "expr": "sum(rate(redpanda_kafka_records_fetched_total[$__rate_interval]))", "legendFormat": "fetched" }
+          ]
+        },
+        {
+          "id": 6,
+          "type": "timeseries",
+          "title": "Kafka request latency p95",
+          "datasource": { "uid": "$datasource" },
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 4 },
+          "fieldConfig": { "defaults": { "unit": "s", "custom": { "drawStyle": "line", "lineWidth": 1, "fillOpacity": 10, "showPoints": "never" } }, "overrides": [] },
+          "options": { "legend": { "displayMode": "list", "placement": "bottom", "showLegend": true }, "tooltip": { "mode": "multi", "sort": "desc" } },
+          "targets": [{ "refId": "A", "expr": "histogram_quantile(0.95, sum by (le) (rate(redpanda_kafka_request_latency_seconds_bucket[$__rate_interval])))", "legendFormat": "p95" }]
+        },
+        {
+          "id": 7,
+          "type": "timeseries",
+          "title": "Memory",
+          "datasource": { "uid": "$datasource" },
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 12 },
+          "fieldConfig": { "defaults": { "unit": "bytes", "custom": { "drawStyle": "line", "lineWidth": 1, "fillOpacity": 10, "showPoints": "never" } }, "overrides": [] },
+          "options": { "legend": { "displayMode": "list", "placement": "bottom", "showLegend": true }, "tooltip": { "mode": "multi", "sort": "desc" } },
+          "targets": [
+            { "refId": "A", "expr": "sum(redpanda_memory_allocated_memory)", "legendFormat": "allocated" },
+            { "refId": "B", "expr": "sum(redpanda_memory_available_memory)", "legendFormat": "available" }
+          ]
+        },
+        {
+          "id": 8,
+          "type": "timeseries",
+          "title": "CPU busy",
+          "datasource": { "uid": "$datasource" },
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 12 },
+          "fieldConfig": { "defaults": { "unit": "percentunit", "custom": { "drawStyle": "line", "lineWidth": 1, "fillOpacity": 10, "showPoints": "never" } }, "overrides": [] },
+          "options": { "legend": { "displayMode": "list", "placement": "bottom", "showLegend": true }, "tooltip": { "mode": "multi", "sort": "desc" } },
+          "targets": [{ "refId": "A", "expr": "sum(rate(redpanda_cpu_busy_seconds_total[$__rate_interval]))", "legendFormat": "busy" }]
+        }
+      ]
+    }
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-dashboard-clickhouse
+  namespace: monitoring
+  labels:
+    grafana_dashboard: "1"
+data:
+  clickhouse-overview.json: |
+    {
+      "uid": "posthog-clickhouse-overview",
+      "title": "ClickHouse / Overview",
+      "tags": ["posthog", "clickhouse"],
+      "timezone": "browser",
+      "schemaVersion": 41,
+      "version": 1,
+      "refresh": "30s",
+      "time": { "from": "now-6h", "to": "now" },
+      "templating": {
+        "list": [
+          { "name": "datasource", "type": "datasource", "query": "prometheus", "current": { "text": "Prometheus", "value": "prometheus" } }
+        ]
+      },
+      "panels": [
+        {
+          "id": 1,
+          "type": "stat",
+          "title": "Queries / sec",
+          "datasource": { "uid": "$datasource" },
+          "gridPos": { "h": 4, "w": 6, "x": 0, "y": 0 },
+          "fieldConfig": { "defaults": { "unit": "qps", "thresholds": { "mode": "absolute", "steps": [{ "color": "green" }] } }, "overrides": [] },
+          "options": { "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "orientation": "auto", "textMode": "auto", "colorMode": "value", "graphMode": "area", "justifyMode": "auto" },
+          "targets": [{ "refId": "A", "expr": "sum(rate(ClickHouseProfileEvents_Query[$__rate_interval]))", "legendFormat": "qps" }]
+        },
+        {
+          "id": 2,
+          "type": "stat",
+          "title": "Failed queries / sec",
+          "datasource": { "uid": "$datasource" },
+          "gridPos": { "h": 4, "w": 6, "x": 6, "y": 0 },
+          "fieldConfig": { "defaults": { "unit": "qps", "thresholds": { "mode": "absolute", "steps": [{ "color": "green" }, { "color": "red", "value": 0.1 }] } }, "overrides": [] },
+          "options": { "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "orientation": "auto", "textMode": "auto", "colorMode": "value", "graphMode": "area", "justifyMode": "auto" },
+          "targets": [{ "refId": "A", "expr": "sum(rate(ClickHouseProfileEvents_FailedQuery[$__rate_interval]))", "legendFormat": "failed" }]
+        },
+        {
+          "id": 3,
+          "type": "stat",
+          "title": "Query memory",
+          "datasource": { "uid": "$datasource" },
+          "gridPos": { "h": 4, "w": 6, "x": 12, "y": 0 },
+          "fieldConfig": { "defaults": { "unit": "bytes", "thresholds": { "mode": "absolute", "steps": [{ "color": "green" }, { "color": "orange", "value": 2147483648 }, { "color": "red", "value": 3435973836 }] } }, "overrides": [] },
+          "options": { "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "orientation": "auto", "textMode": "auto", "colorMode": "value", "graphMode": "area", "justifyMode": "auto" },
+          "targets": [{ "refId": "A", "expr": "max(ClickHouseAsyncMetrics_QueriesMemoryUsage)", "legendFormat": "memory" }]
+        },
+        {
+          "id": 4,
+          "type": "stat",
+          "title": "Parts",
+          "datasource": { "uid": "$datasource" },
+          "gridPos": { "h": 4, "w": 6, "x": 18, "y": 0 },
+          "fieldConfig": { "defaults": { "unit": "short", "thresholds": { "mode": "absolute", "steps": [{ "color": "green" }, { "color": "orange", "value": 10000 }, { "color": "red", "value": 50000 }] } }, "overrides": [] },
+          "options": { "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "orientation": "auto", "textMode": "auto", "colorMode": "value", "graphMode": "area", "justifyMode": "auto" },
+          "targets": [{ "refId": "A", "expr": "max(ClickHouseAsyncMetrics_TotalPartsOfMergeTreeTables)", "legendFormat": "parts" }]
+        },
+        {
+          "id": 5,
+          "type": "timeseries",
+          "title": "Queries",
+          "datasource": { "uid": "$datasource" },
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 4 },
+          "fieldConfig": { "defaults": { "unit": "qps", "custom": { "drawStyle": "line", "lineWidth": 1, "fillOpacity": 10, "showPoints": "never" } }, "overrides": [] },
+          "options": { "legend": { "displayMode": "list", "placement": "bottom", "showLegend": true }, "tooltip": { "mode": "multi", "sort": "desc" } },
+          "targets": [
+            { "refId": "A", "expr": "sum(rate(ClickHouseProfileEvents_Query[$__rate_interval]))", "legendFormat": "all" },
+            { "refId": "B", "expr": "sum(rate(ClickHouseProfileEvents_SelectQuery[$__rate_interval]))", "legendFormat": "select" },
+            { "refId": "C", "expr": "sum(rate(ClickHouseProfileEvents_InsertQuery[$__rate_interval]))", "legendFormat": "insert" },
+            { "refId": "D", "expr": "sum(rate(ClickHouseProfileEvents_FailedQuery[$__rate_interval]))", "legendFormat": "failed" }
+          ]
+        },
+        {
+          "id": 6,
+          "type": "timeseries",
+          "title": "Rows read/inserted",
+          "datasource": { "uid": "$datasource" },
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 4 },
+          "fieldConfig": { "defaults": { "unit": "rps", "custom": { "drawStyle": "line", "lineWidth": 1, "fillOpacity": 10, "showPoints": "never" } }, "overrides": [] },
+          "options": { "legend": { "displayMode": "list", "placement": "bottom", "showLegend": true }, "tooltip": { "mode": "multi", "sort": "desc" } },
+          "targets": [
+            { "refId": "A", "expr": "sum(rate(ClickHouseProfileEvents_SelectedRows[$__rate_interval]))", "legendFormat": "selected" },
+            { "refId": "B", "expr": "sum(rate(ClickHouseProfileEvents_InsertedRows[$__rate_interval]))", "legendFormat": "inserted" }
+          ]
+        },
+        {
+          "id": 7,
+          "type": "timeseries",
+          "title": "Memory",
+          "datasource": { "uid": "$datasource" },
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 12 },
+          "fieldConfig": { "defaults": { "unit": "bytes", "custom": { "drawStyle": "line", "lineWidth": 1, "fillOpacity": 10, "showPoints": "never" } }, "overrides": [] },
+          "options": { "legend": { "displayMode": "list", "placement": "bottom", "showLegend": true }, "tooltip": { "mode": "multi", "sort": "desc" } },
+          "targets": [
+            { "refId": "A", "expr": "max(ClickHouseAsyncMetrics_QueriesMemoryUsage)", "legendFormat": "queries" },
+            { "refId": "B", "expr": "max(ClickHouseAsyncMetrics_MemoryResident)", "legendFormat": "resident" },
+            { "refId": "C", "expr": "max(ClickHouseAsyncMetrics_CGroupMemoryUsed)", "legendFormat": "cgroup used" }
+          ]
+        },
+        {
+          "id": 8,
+          "type": "timeseries",
+          "title": "MergeTree size and parts",
+          "datasource": { "uid": "$datasource" },
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 12 },
+          "fieldConfig": { "defaults": { "unit": "short", "custom": { "drawStyle": "line", "lineWidth": 1, "fillOpacity": 10, "showPoints": "never" } }, "overrides": [{ "matcher": { "id": "byName", "options": "bytes" }, "properties": [{ "id": "unit", "value": "bytes" }] }] },
+          "options": { "legend": { "displayMode": "list", "placement": "bottom", "showLegend": true }, "tooltip": { "mode": "multi", "sort": "desc" } },
+          "targets": [
+            { "refId": "A", "expr": "max(ClickHouseAsyncMetrics_TotalBytesOfMergeTreeTables)", "legendFormat": "bytes" },
+            { "refId": "B", "expr": "max(ClickHouseAsyncMetrics_TotalPartsOfMergeTreeTables)", "legendFormat": "parts" }
+          ]
+        }
+      ]
+    }

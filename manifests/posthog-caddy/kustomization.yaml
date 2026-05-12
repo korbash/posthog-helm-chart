@@ -10,6 +10,7 @@ resources:
   - db-certificates.yaml
   - db-routing.yaml
   - monitoring.yaml
+  - grafana-dashboards.yaml
 
 patches:
   - path: release.patch.yaml
