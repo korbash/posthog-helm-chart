@@ -14,3 +14,4 @@ resources:
   - cnpg.yaml
   - altinity-clickhouse-operator.yaml
   - redpanda-operator.yaml
+  - kube-prometheus-stack.yaml

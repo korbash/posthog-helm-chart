@@ -57,6 +57,7 @@ manifests/
     namespaces.yaml               # cert-manager, cnpg-system namespaces
     cert-manager.yaml             # HelmRelease for cert-manager
     cnpg.yaml                     # HelmRelease for CloudNativePG
+    kube-prometheus-stack.yaml    # HelmRelease for Prometheus, Alertmanager, Grafana, node-exporter, kube-state-metrics
     # ECK is installed from Elastic's official crds.yaml + operator.yaml
     # because the Helm chart tarball endpoint currently returns 403.
     # ... plus remote CRD references:
@@ -109,10 +110,15 @@ With Flux's kustomize-controller, this dance happens automatically (it retries f
 # Operators and CRs
 kubectl get helmrelease -A
 kubectl get clickhouseinstallation,clickhousekeeperinstallation,elasticsearch,redpanda,cluster -n posthog
+kubectl get helmrelease -n monitoring kube-prometheus-stack
 
 # PostHog app
 kubectl get pods -n posthog
+kubectl get pods -n monitoring
+kubectl get secret -n monitoring grafana-admin -o go-template='{{ index .data "admin-password" | base64decode }}{{ "\n" }}'
 ```
+
+Grafana is exposed at `https://grafana.37.27.124.54.nip.io` with username `admin` and the generated password above.
 
 Expected state after convergence: ~32 pods Running, hooks completed, `posthog` HelmRelease `True`.
 
