@@ -47,6 +47,16 @@ spec:
           default: true
         exposedPort: 443
         port: 443
+      postgres:
+        expose:
+          default: true
+        exposedPort: 5432
+        port: 5432
+      clickhouse:
+        expose:
+          default: true
+        exposedPort: 9440
+        port: 9440
       # Avoid conflicts with node-exporter (9100) and other host services (8080)
       metrics:
         port: 19100

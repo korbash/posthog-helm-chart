@@ -4,3 +4,31 @@
 - op: replace
   path: /spec/templates/volumeClaimTemplates/0/spec/resources/requests/storage
   value: 80Gi
+- op: add
+  path: /spec/configuration/files/config.d~1secure_native_tls.xml
+  value: |
+    <clickhouse>
+      <tcp_port_secure>9440</tcp_port_secure>
+      <openSSL>
+        <server>
+          <certificateFile>/etc/clickhouse-server/tls/tls.crt</certificateFile>
+          <privateKeyFile>/etc/clickhouse-server/tls/tls.key</privateKeyFile>
+          <verificationMode>none</verificationMode>
+          <cacheSessions>true</cacheSessions>
+          <disableProtocols>sslv2,sslv3,tlsv1,tlsv1_1</disableProtocols>
+          <preferServerCiphers>true</preferServerCiphers>
+        </server>
+      </openSSL>
+    </clickhouse>
+- op: add
+  path: /spec/templates/podTemplates/0/spec/containers/0/volumeMounts/-
+  value:
+    name: clickhouse-tls
+    mountPath: /etc/clickhouse-server/tls
+    readOnly: true
+- op: add
+  path: /spec/templates/podTemplates/0/spec/volumes/-
+  value:
+    name: clickhouse-tls
+    secret:
+      secretName: clickhouse-tls

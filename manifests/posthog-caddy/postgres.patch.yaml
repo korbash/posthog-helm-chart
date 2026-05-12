@@ -4,3 +4,8 @@
 - op: replace
   path: /spec/storage/size
   value: 20Gi
+- op: add
+  path: /spec/certificates
+  value:
+    serverCASecret: postgres-tls-ca
+    serverTLSSecret: postgres-tls

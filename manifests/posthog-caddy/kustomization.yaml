@@ -7,6 +7,8 @@ resources:
   - legacy-caddy.yaml
   - letsencrypt-issuer.yaml
   - posthog-certificate.yaml
+  - db-certificates.yaml
+  - db-routing.yaml
 
 patches:
   - path: release.patch.yaml
