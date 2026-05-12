@@ -27,6 +27,8 @@ spec:
       replicas: 1
       # Required for DNS resolution when using hostNetwork
       dnsPolicy: ClusterFirstWithHostNet
+      strategy:
+        type: Recreate
     # Bind directly on host network so Traefik owns ports 80/443 without NodePort
     hostNetwork: true
     ingressClass:
