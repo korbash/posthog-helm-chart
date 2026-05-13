@@ -4,8 +4,13 @@
 # host loopback, so the Endpoints below reach Docker Caddy on its internal ports.
 #
 # HTTP flow:  spposthog.gg:80  -> Traefik (web) -> IngressRoute -> legacy-caddy-http -> Caddy :18080
-# HTTPS flow: spposthog.gg:443 -> Traefik (websecure) TCP SNI passthrough -> legacy-caddy-https -> Caddy :18443
-# Caddy continues to own the TLS cert for spposthog.gg and handles ACME renewal.
+# HTTPS flow: spposthog.gg:443 -> Traefik (websecure) terminates TLS -> legacy-caddy-http -> Caddy :18080
+#
+# Note: Switched from TCP SNI passthrough (2026-05-13) because Caddy stopped
+# listening on :18443 after compose proxy container recreate (Let's Encrypt ACME
+# challenges fail behind Traefik). Traefik now terminates TLS with its own cert
+# resolver and forwards plain HTTP to Caddy. legacy-caddy-https Service+Endpoints
+# kept for potential future revert to TLS passthrough once Caddy reclaims :443.
 ---
 apiVersion: v1
 kind: Service
@@ -66,10 +71,11 @@ spec:
         - name: legacy-caddy-http
           port: 80
 ---
-# TCP passthrough: Traefik forwards raw TLS bytes to Caddy.
-# Caddy terminates TLS and holds the spposthog.gg certificate.
+# HTTPS: Traefik terminates TLS and forwards plain HTTP to Caddy on :18080.
+# Traefik uses its default cert resolver (fallback cert) — works with Cloudflare
+# in Full SSL mode (not Full Strict).
 apiVersion: traefik.io/v1alpha1
-kind: IngressRouteTCP
+kind: IngressRoute
 metadata:
   name: spposthog-https
   namespace: traefik
@@ -77,9 +83,9 @@ spec:
   entryPoints:
     - websecure
   routes:
-    - match: HostSNI(`spposthog.gg`)
+    - kind: Rule
+      match: Host(`spposthog.gg`)
       services:
-        - name: legacy-caddy-https
-          port: 443
-  tls:
-    passthrough: true
+        - name: legacy-caddy-http
+          port: 80
+  tls: {}
